@@ -1,18 +1,15 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from src.sim.quadson import Quadson
-from src.sim.interface import Interface
-from src.config import Config
-from analyze_stability import analyze_stability, plot_stability
-
 from stable_baselines3 import PPO
 import pybullet as p
 import pybullet_data
 import time
+from pathlib import Path
+from sim.quadson import Quadson
+from sim.interface import Interface
+from common.config import Config
+from analyze_stability import analyze_stability, plot_stability
 
-model = PPO.load("../assets/trained/quadson_ppo", device='cpu')
+model_path = Path(__file__).resolve().parent.parent.parent / "assets/trained/quadson_ppo"
+model = PPO.load(model_path, device='cpu')
 
 dt = 1 / 240
 current_time = 0.0
