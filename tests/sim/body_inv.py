@@ -1,12 +1,8 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import pybullet as p
 import pybullet_data
 import time
-from src.sim.quadson import Quadson
-from src.sim.interface import Interface
+from sim.quadson import Quadson
+from sim.interface import Interface
 
 def main():
   p.connect(p.GUI) # (GUI for visualization, DIRECT for headless)

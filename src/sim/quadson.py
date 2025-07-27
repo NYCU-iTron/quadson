@@ -1,6 +1,7 @@
 import pybullet as p
 import numpy as np
 from typing import Dict
+from pathlib import Path
 from common.config import Config
 from common.body_kinematics import BodyKinematics
 from common.locomotion import Locomotion
@@ -9,7 +10,8 @@ from sim.leg_group import LegGroup
 
 class Quadson:
   def __init__(self, interface: Interface = None):
-    self.robot_id = p.loadURDF("../assets/whole_body/urdf/quadson_modified.urdf",
+    urdf_path = Path(__file__).resolve().parent.parent.parent / "assets/whole_body/urdf/quadson_modified.urdf"
+    self.robot_id = p.loadURDF(str(urdf_path),
                                       basePosition=[0, 0, 0.2],
                                       useFixedBase=False)
     self.config = Config()

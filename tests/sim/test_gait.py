@@ -1,11 +1,7 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import pybullet as p
 import pybullet_data
 import time
-from src.sim.quadson import Quadson
+from sim.quadson import Quadson
 from analyze_stability import analyze_stability, plot_stability
 
 def main():

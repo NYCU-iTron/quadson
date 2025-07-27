@@ -1,11 +1,10 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import pybullet as p
 import time
 import numpy as np
-from src.leg_kinematics import LegKinematics
+from pathlib import Path
+from common.leg_kinematics import LegKinematics
+
+urdf_path = Path(__file__).resolve().parent.parent.parent / "assets/single_leg/urdf/single_leg.urdf"
 
 def joint_ctrl(joint_index, target_angle):
   p.setJointMotorControl2(
@@ -32,7 +31,7 @@ def enfore_closure(theory_angles):
 p.connect(p.GUI)
 p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
 p.setGravity(0, 0, -9.81)
-robot_id = p.loadURDF("../assets/single_leg/urdf/single_leg.urdf", useFixedBase=True)
+robot_id = p.loadURDF(str(urdf_path), useFixedBase=True)
 time_step = 1.0 / 240.0
 p.setRealTimeSimulation(0)
 kinematics = LegKinematics(DEBUG=True)

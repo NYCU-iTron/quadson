@@ -1,5 +1,4 @@
 from cando import *
-from typing import Any
 from real.can_config import *
 
 class Motor:
