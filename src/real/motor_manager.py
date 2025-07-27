@@ -1,10 +1,9 @@
+import os
+import time
+import math
 import struct
 import threading
-import time
 import cando
-import math
-import sys
-import os
 from real.can_config import *
 from real.can_message import CanMessage
 from real.motor import Motor
@@ -30,30 +29,29 @@ class MotorManager:
 		self.thread_stop_event.set()
 		self.reading_thread.start()
 
-		self._scan_motors()
-		self._set_auto_receive(True)
+		self.scan_motors()
+		self.set_auto_receive(True)
 	
-	def connect_can_device(self):
+	def connect_can_device(self) -> None:
 		self.dev_lists = cando.list_scan()
 
 		if len(self.dev_lists) == 0:
-			print("Device not found!")
-			sys.exit(0)
-
-		if os.name == 'posix':  # for linux os
-			if self.dev_lists[0].is_kernel_driver_active(0):
-				self.dev_lists[0].detach_kernel_driver(0)
+			raise Exception("No CAN device found!")
+		
+		# For linux os
+		if os.name == 'posix' and self.dev_lists[0].is_kernel_driver_active(0):
+			self.dev_lists[0].detach_kernel_driver(0)
 
 		# set baudrate: 500K, sample point: 87.5%
 		cando.dev_set_timing(self.dev_lists[0], 1, 12, 6, 1, 6)
 
 		cando.dev_start(self.dev_lists[0], cando.CANDO_MODE_NORMAL | cando.CANDO_MODE_NO_ECHO_BACK)
 
-	def disconnect_can_device(self):
+	def disconnect_can_device(self) -> None:
 		self.thread_stop_event.clear()
 		cando.dev_stop(self.dev_lists[0])
 	
-	def send_motor_cmd(self, motor_index, cmd, value):
+	def send_motor_cmd(self, motor_index, cmd, value) -> None:
 		if self.motor_list[motor_index-1].exist == False:
 			print("Motor unconnected")
 			return
@@ -71,7 +69,7 @@ class MotorManager:
 		cando.dev_frame_send(self.dev_lists[0], send_frame)
 		# print("sending message id:" + str(send_frame.can_id))
 		
-	def get_angle(self, motor_id):
+	def get_angle(self, motor_id) -> float:
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_PRESENT_REVOLUTION, 0)
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_PRESENT_POSITION_DEG, 0)
 		
@@ -84,15 +82,15 @@ class MotorManager:
 		
 		return angle
 
-	def set_angle(self, motor_id, angle):
+	def set_angle(self, motor_id, angle) -> None:
 		can_signal = angle * 32768 / 180
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_GOAL_POSITION_DEG, can_signal)
 
-	def get_omega(self, motor_id):
+	def get_omega(self, motor_id) -> float:
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_PRESENT_VELOCITY_DPS, 0)
 		velocity_01 = self.motor_list[motor_id-1].get_param(CMD_TYPE.PRESENT_VELOCITY_DPS)
 
-		omega = (((velocity_01*10) / 65536))/71.96 * 2 * math.pi
+		omega = (((velocity_01 * 10) / 65536)) / 71.96 * 2 * math.pi
 		# print("omega: " + str(omega))
 		return omega
 	
@@ -100,19 +98,16 @@ class MotorManager:
 		can_signal = omega * 32768 / 180
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_GOAL_VELOCITY_DPS, can_signal)
 
-	def _can_read_handle(self):
+	def _can_read_handle(self) -> None:
 		while self.thread_stop_event.isSet():
 			self.thread_pause_event.wait()
 			if cando.dev_frame_read(self.dev_lists[0], self.rec_frame, 1):
-				if (not self._msg_error(self.rec_frame)):
-					self._decode_msg(self.rec_frame)
-				else:
-					print("reading error")
+				if (self._msg_error(self.rec_frame)):
 					self.disconnect_can_device()
+					raise Exception("Reading error")
+				self._decode_msg(self.rec_frame)
 	
-	def _scan_motors(self):
-		print("Scaning...")
-
+	def scan_motors(self) -> None:
 		for i in range(1, 13):
 			# Prepare frame
 			send_frame = cando.Frame()
@@ -121,6 +116,7 @@ class MotorManager:
 			# send_frame.can_dlc = 8
 			# send_frame.data = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
 			cando.dev_frame_send(self.dev_lists[0], send_frame)
+			
 			time.sleep(0.001)
 
 			if cando.dev_frame_read(self.dev_lists[0], self.rec_frame, 1):
@@ -130,9 +126,8 @@ class MotorManager:
 						self.motor_list[i-1].exist = True
 						print("Receive from motor " + str(i))
 					else:
-						print("Scanning error")
 						self.disconnect_can_device()
-						sys.exit(0)
+						raise Exception("Scanning error")
 			else:
 				self.motor_list[i-1].exist = False
 				print("Motor " + str(i) + " no response")
@@ -140,13 +135,13 @@ class MotorManager:
 		for x in range(10):
 			cando.dev_frame_read(self.dev_lists[0], self.rec_frame, 1)
 
-	def _set_auto_receive(self, enable):
+	def set_auto_receive(self, enable) -> None:
 		if enable:
 			self.thread_pause_event.set()
 		else:
 			self.thread_pause_event.clear()
 
-	def _msg_error(self, rec_frame):
+	def _msg_error(self, rec_frame) -> bool:
 		if rec_frame.can_id & cando.CANDO_ID_ERR:
 			error_code, err_tx, err_rx = cando.parse_err_frame(rec_frame)
 			print("Error: ")
@@ -178,7 +173,7 @@ class MotorManager:
 		else:
 			return False
 
-	def _decode_msg(self, rec_frame):
+	def _decode_msg(self, rec_frame) -> CanMessage:
 		# print(" is_extend : " + ("True" if self.rec_frame.can_id & CANDO_ID_EXTENDED else "False"))
 		# print(" is_rtr : " + ("True" if self.rec_frame.can_id & CANDO_ID_RTR	else "False"))
 		# print(" can_id : " + str(self.rec_frame.can_id & CANDO_ID_MASK))
