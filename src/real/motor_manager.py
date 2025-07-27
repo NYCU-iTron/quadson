@@ -72,7 +72,7 @@ class MotorManager:
 		cando.dev_frame_send(self.device, send_frame)
 		# print("sending message id:" + str(send_frame.can_id))
 		
-	def get_angle(self, motor_id) -> float:
+	def get_motor_angle(self, motor_id) -> float:
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_PRESENT_REVOLUTION, 0)
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_PRESENT_POSITION_DEG, 0)
 		
@@ -85,11 +85,11 @@ class MotorManager:
 		
 		return angle
 
-	def set_angle(self, motor_id, angle) -> None:
+	def set_motor_angle(self, motor_id, angle) -> None:
 		can_signal = angle * 32768 / 180
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_GOAL_POSITION_DEG, can_signal)
 
-	def get_omega(self, motor_id) -> float:
+	def get_motor_omega(self, motor_id) -> float:
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_PRESENT_VELOCITY_DPS, 0)
 		velocity_01 = self.motor_dict[motor_id].get_param(CMD_TYPE.PRESENT_VELOCITY_DPS)
 
@@ -97,7 +97,7 @@ class MotorManager:
 		# print("omega: " + str(omega))
 		return omega
 	
-	def set_omega(self, motor_id, omega):
+	def set_motor_omega(self, motor_id, omega):
 		can_signal = omega * 32768 / 180
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_GOAL_VELOCITY_DPS, can_signal)
 
