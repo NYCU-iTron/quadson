@@ -99,7 +99,7 @@ class MotorManager:
 			cando.dev_frame_read(self.device, self.received_frame, 1)
 
 		print(f"{self.__class__.__name__} ends scaning motors")
-		return self.motor_dict
+		return motor_dict
 
 	def can_read_handle(self) -> None:
 		while self.thread_stop_event.isSet():
@@ -114,7 +114,8 @@ class MotorManager:
 				self.disconnect_can_device()
 				raise Exception(f"{self.__class__.__name__}: can frame read error")
 			
-			self.decode_msg(self.received_frame)
+			can_pack = self.decode_msg(self.received_frame)
+			self.motor_dict[can_pack.motor_id].update_param(can_pack.id_type, can_pack.msg_id, can_pack.data)
 
 	def send_motor_cmd(self, motor_id: int, cmd: CAN_STD_TYPE | CAN_EXT_TYPE, value) -> None:
 		if self.motor_dict[motor_id].exist == False:
@@ -193,8 +194,6 @@ class MotorManager:
 		if (group_mag):
 			pass
 
-		self.motor_dict[motor_id].update_param(id_type, msg_id, value)
-		
 		return CanMessage(motor_id, id_type, msg_id, value)
 
 # -------------------------- Motor api for leg group ------------------------- #
