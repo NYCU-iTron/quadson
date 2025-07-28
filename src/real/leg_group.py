@@ -48,3 +48,4 @@ class LegGroup:
 
     def get_ee_point(self) -> list[float]:
         return self.leg_kinematics.get_ee_point()
+    

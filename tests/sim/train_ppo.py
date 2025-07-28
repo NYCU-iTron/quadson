@@ -1,9 +1,5 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from stable_baselines3 import PPO
-from src.sim.quadson_env import QuadsonEnv, PlottingCallback
+from sim.quadson_env import QuadsonEnv, PlottingCallback
 from stable_baselines3.common.env_util import make_vec_env
 
 # env = QuadsonEnv()
@@ -15,18 +11,18 @@ from stable_baselines3.common.env_util import make_vec_env
 env = QuadsonEnv()
 
 model = PPO(
-  'MlpPolicy', 
-  env, 
-  verbose=0,
-  learning_rate=5e-5,  # Current rate seems low
-  n_steps=2048, 
-  batch_size=256,
-  device='cpu',
-  gamma=0.995,  # Add discount factor
-  gae_lambda=0.95,  # Add GAE parameter
-  ent_coef=0.01,  # Add entropy coefficient for exploration
-  n_epochs=10,  # Number of epochs for each update
-  clip_range=0.2  # PPO clip range
+    'MlpPolicy', 
+    env, 
+    verbose=0,
+    learning_rate=5e-5,  # Current rate seems low
+    n_steps=2048, 
+    batch_size=256,
+    device='cpu',
+    gamma=0.995,  # Add discount factor
+    gae_lambda=0.95,  # Add GAE parameter
+    ent_coef=0.01,  # Add entropy coefficient for exploration
+    n_epochs=10,  # Number of epochs for each update
+    clip_range=0.2  # PPO clip range
 )
 
 plotting_callback = PlottingCallback()

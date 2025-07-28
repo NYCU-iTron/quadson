@@ -4,3 +4,4 @@ class CanMessage:
         self.id_type = id_type
         self.msg_id = msg_id 
         self.data = data
+        

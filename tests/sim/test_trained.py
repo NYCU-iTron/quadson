@@ -29,43 +29,43 @@ config = Config()
 # Initial observation
 obs = robot.get_observation()
 observations = {
-  'pos': [],
-  'euler_ori': [],
-  'linear_vel': [],
+    'pos': [],
+    'euler_ori': [],
+    'linear_vel': [],
 }
 times = []
 
 # Run the model
 steps = 960
 for step in range(steps):
-  action, _states = model.predict(obs, deterministic=True)
-  cmd_dict = {}
-  for i, leg_name in enumerate(config.legs):  # Adjust leg names as per your config
-    start = i * 3
-    end = start + 3
-    cmd_dict[leg_name] = action[start:end]
-  robot.update(cmd_dict)
+    action, _states = model.predict(obs, deterministic=True)
+    cmd_dict = {}
+    for i, leg_name in enumerate(config.legs):  # Adjust leg names as per your config
+        start = i * 3
+        end = start + 3
+        cmd_dict[leg_name] = action[start:end]
+    robot.update(cmd_dict)
 
-  p.stepSimulation()
+    p.stepSimulation()
 
-  obs = robot.get_observation()
-  euler_ori = obs[0:3]  # roll, pitch, yaw
-  linear_vel = obs[3:6]  # x, y, z velocity
-  pos, _ = p.getBasePositionAndOrientation(robot.robot_id)
+    obs = robot.get_observation()
+    euler_ori = obs[0:3]  # roll, pitch, yaw
+    linear_vel = obs[3:6]  # x, y, z velocity
+    pos, _ = p.getBasePositionAndOrientation(robot.robot_id)
 
-  # Store reduced data
-  if step > 240:
-    observations['pos'].append(pos)
-    observations['euler_ori'].append(euler_ori)
-    observations['linear_vel'].append(linear_vel)
-    times.append(step * (1/240))  # Time in seconds
+    # Store reduced data
+    if step > 240:
+        observations['pos'].append(pos)
+        observations['euler_ori'].append(euler_ori)
+        observations['linear_vel'].append(linear_vel)
+        times.append(step * (1/240))  # Time in seconds
 
-  # Fixed camera position relative to the robot
-  base_pos, _ = p.getBasePositionAndOrientation(robot.robot_id)
-  p.resetDebugVisualizerCamera(cameraDistance=0.8, cameraYaw=50, cameraPitch=-20, cameraTargetPosition=base_pos)
+    # Fixed camera position relative to the robot
+    base_pos, _ = p.getBasePositionAndOrientation(robot.robot_id)
+    p.resetDebugVisualizerCamera(cameraDistance=0.8, cameraYaw=50, cameraPitch=-20, cameraTargetPosition=base_pos)
 
-  current_time += dt
-  time.sleep(dt)
+    current_time += dt
+    time.sleep(dt)
 
 metrics = analyze_stability(observations)
 plot_stability(times, observations, metrics)

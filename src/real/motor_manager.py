@@ -237,3 +237,4 @@ class MotorManager:
         omega = (((velocity_01 * 10) / 65536)) / 71.96 * 2 * math.pi
         # print("omega: " + str(omega))
         return omega
+    
