@@ -44,11 +44,6 @@ COPY requirements-sim.txt /root/quadson_py/requirements-sim.txt
 RUN pip3 install --no-cache-dir -r /root/quadson_py/requirements-can.txt
 RUN pip3 install --no-cache-dir -r /root/quadson_py/requirements-sim.txt
 
-# Install project files
-COPY src/ /root/quadson_py/src/
-COPY setup.py /root/quadson_py/setup.py
-RUN pip install --no-cache-dir -e /root/quadson_py
-
 # Dependencies and tools
 RUN apt-get update && apt-get install -y build-essential
 RUN apt-get update && apt-get install -y tmux
@@ -64,7 +59,9 @@ COPY scripts/start_can.sh /root/quadson_py/scripts/start_can.sh
 COPY scripts/stop_can.sh /root/quadson_py/scripts/stop_can.sh
 RUN chmod +x /root/quadson_py/scripts/*.sh
 
-# Remove cache
-RUN rm -rf /var/lib/apt/lists/*
+# Install project files
+COPY src/ /root/quadson_py/src/
+COPY setup.py /root/quadson_py/setup.py
+RUN pip install --no-cache-dir -e /root/quadson_py
 
 WORKDIR /root/quadson_py
