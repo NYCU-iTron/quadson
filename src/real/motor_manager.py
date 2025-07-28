@@ -198,7 +198,7 @@ class MotorManager:
 		return CanMessage(motor_id, id_type, msg_id, value)
 
 # -------------------------- Motor api for leg group ------------------------- #
-	def enable_motor_torque(self, motor_id, enable) -> None:
+	def enable_motor_torque(self, motor_id: int, enable: bool) -> None:
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_TORQUE_ENABLE, enable)
 
 	def set_control_mode(self, motor_id: int, mode: int) -> None:
