@@ -55,16 +55,16 @@ class MotorManager:
 	def connect_motors(self) -> dict[int, Motor]:
 		# Create 12 motor objects
 		# Motor ID starts from 1, ends at 12
-		self.motor_dict = {}
-		for x in range(1, 13):
-			self.motor_dict[x] = Motor(x, False)
-
+		motor_dict = {}
+		for motor_id in range(1, 13):
+			motor_dict[motor_id] = Motor(motor_id, False)
+		
 		print(f"{self.__class__.__name__} starts scaning motors")
 		
-		for i in range(1, 13):
+		for motor_id in range(1, 13):
 			# Prepare frame
 			send_frame = cando.Frame()
-			send_frame.can_id = 0x00 | (i << 6)
+			send_frame.can_id = 0x00 | (motor_id << 6)
 			send_frame.can_id |= cando.CANDO_ID_RTR
 			# send_frame.can_dlc = 8
 			# send_frame.data = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
@@ -74,25 +74,25 @@ class MotorManager:
 
 			# Check if the motor responds
 			if not cando.dev_frame_read(self.device, self.received_frame, 1):
-				self.motor_dict[i].exist = False
-				print(f"Motor {i} no response")
+				motor_dict[motor_id].exist = False
+				print(f"Motor {motor_id} no response")
 				continue
 
 			# Check if the message has error
 			if self.msg_error(self.received_frame):
-				self.motor_dict[i].exist = False
-				print(f"Motor {i} has message error")
+				motor_dict[motor_id].exist = False
+				print(f"Motor {motor_id} has message error")
 				continue
 			
 			# Decode the message
 			# and check if the motor ID matches
 			can_pack = self.decode_msg(self.received_frame)
-			if i == can_pack.motor_id:
-				self.motor_dict[i].exist = True
-				print(f"Motor {i} received")
+			if motor_id == can_pack.motor_id:
+				motor_dict[motor_id].exist = True
+				print(f"Motor {motor_id} received")
 			else:
 				self.disconnect_can_device()
-				raise Exception(f"{self.__class__.__name__}: expected motor {i}, but got {can_pack.motor_id}")
+				raise Exception(f"{self.__class__.__name__}: expected motor {motor_id}, but got {can_pack.motor_id}")
 
 		# Read frames to clear the buffer
 		for x in range(10):
@@ -116,17 +116,17 @@ class MotorManager:
 			
 			self.decode_msg(self.received_frame)
 
-	def send_motor_cmd(self, motor_index, cmd, value) -> None:
-		if self.motor_dict[motor_index].exist == False:
-			print(f"Motor {motor_index} not connect")
+	def send_motor_cmd(self, motor_id: int, cmd: CAN_STD_TYPE | CAN_EXT_TYPE, value) -> None:
+		if self.motor_dict[motor_id].exist == False:
+			print(f"Motor {motor_id} not connect")
 			return
 
 		send_frame = cando.Frame()
 		
 		if (cmd.__class__) == CAN_STD_TYPE:
-			send_frame.can_id = 0x00 | (motor_index << ID_STD_OFFSET) | cmd.value
+			send_frame.can_id = 0x00 | (motor_id << ID_STD_OFFSET) | cmd.value
 		else:
-			send_frame.can_id = 0x00 | (motor_index << ID_EXT_OFFSET) | cmd.value
+			send_frame.can_id = 0x00 | (motor_id << ID_EXT_OFFSET) | cmd.value
 			send_frame.can_id |= cando.CANDO_ID_EXTENDED
 
 		send_frame.can_dlc = 2
