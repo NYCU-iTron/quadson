@@ -201,14 +201,23 @@ class MotorManager:
 	def enable_motor_torque(self, motor_id, enable) -> None:
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_TORQUE_ENABLE, enable)
 
+	def set_control_mode(self, motor_id: int, mode: int) -> None:
+		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_CONTROL_MODE, mode)
+
 	def set_motor_angle(self, motor_id, angle) -> None:
 		can_signal = angle * 32768 / 180
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_GOAL_POSITION_DEG, can_signal)
-
+	
 	def set_motor_omega(self, motor_id, omega) -> None:
 		can_signal = omega * 32768 / 180
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_GOAL_VELOCITY_DPS, can_signal)
-		
+
+	def get_zero_state(self, motor_id: int) -> bool:
+		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_ZERO_DONE, 0)
+		zero_state = self.motor_dict[motor_id].get_param(CMD_TYPE.ZERO_DONE)
+
+		return zero_state == 1
+	
 	def get_motor_angle(self, motor_id) -> float:
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_PRESENT_REVOLUTION, 0)
 		self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_PRESENT_POSITION_DEG, 0)
