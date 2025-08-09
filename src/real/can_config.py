@@ -27,8 +27,7 @@ class CAN_STD_TYPE(IntEnum):
 
     CAN_STDID_PRESENT_VOLTAGE = auto()
     CAN_STDID_PRESENT_TEMPERATURE = auto()
-    CAN_STDID_MOVING = auto()
-    CAN_STDID_ZERO_DONE = auto()
+    CAN_STDID_ZERO_STATE = auto()
 
     CAN_STDID_GROUP0 = auto()
     CAN_STDID_GROUP1 = auto()
@@ -166,8 +165,7 @@ class CMD_TYPE(IntEnum):
     PRESENT_FLUX_CURRENT_MA = auto()
     PRESENT_VOLTAGE = auto()
     PRESENT_TEMPERATURE = auto()
-    MOVING = auto()
-    ZERO_DONE = auto()
+    ZERO_STATE = auto()
 
 Param_Dict = {
     CMD_TYPE.MODEL_NUMBER : 0,
@@ -232,6 +230,5 @@ Param_Dict = {
     CMD_TYPE.PRESENT_FLUX_CURRENT_MA : 0,
     CMD_TYPE.PRESENT_VOLTAGE : 0,
     CMD_TYPE.PRESENT_TEMPERATURE : 0,
-    CMD_TYPE.MOVING : 0,
-    CMD_TYPE.ZERO_DONE : 0,
+    CMD_TYPE.ZERO_STATE : 0,
 }

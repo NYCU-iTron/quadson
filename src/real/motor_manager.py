@@ -1,6 +1,6 @@
 import os
 import time
-import math
+import numpy as np
 import struct
 import threading
 import cando
@@ -141,7 +141,7 @@ class MotorManager:
             can_pack = self.decode_msg(self.received_frame)
             self.motor_dict[can_pack.motor_id].update_param(can_pack.id_type, can_pack.msg_id, can_pack.data)
 
-    def send_motor_cmd(self, motor_id: int, cmd, value) -> None:
+    def send_motor_cmd(self, motor_id: int, cmd: IntEnum, value: int) -> None:
         if self.motor_dict[motor_id].exist == False:
             self.logger.warning(f"Motor {motor_id} does not exist, cannot send command")
             return
@@ -225,17 +225,18 @@ class MotorManager:
     def set_control_mode(self, motor_id: int, mode: int) -> None:
         self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_CONTROL_MODE, mode)
 
-    def set_motor_angle(self, motor_id, angle) -> None:
-        can_signal = angle * 32768 / 180
+    def set_motor_angle(self, motor_id: int, angle) -> None:
+        can_signal = int(round(angle * 32768 / np.pi))
         self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_GOAL_POSITION_DEG, can_signal)
     
-    def set_motor_omega(self, motor_id, omega) -> None:
-        can_signal = omega * 32768 / 180
+    def set_motor_omega(self, motor_id: int, omega) -> None:
+        can_signal = int(round(omega * 32768 / np.pi))
         self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_GOAL_VELOCITY_DPS, can_signal)
 
-    def get_zero_state(self, motor_id: int):
-        self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_ZERO_DONE, 0)
-        zero_state = self.motor_dict[motor_id].get_param(CMD_TYPE.ZERO_DONE)
+    def get_zero_state(self, motor_id: int) -> int:
+        self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_ZERO_STATE, 0)
+        zero_state = self.motor_dict[motor_id].get_param(CMD_TYPE.ZERO_STATE)
+        zero_state = int(zero_state)
 
         return zero_state
     
@@ -247,7 +248,7 @@ class MotorManager:
         angle_16 = self.motor_dict[motor_id].get_param(CMD_TYPE.PRESENT_POSITION_DEG)
         # print("rev: " + str(revolution) + "  angle: " + str(angle_16))
 
-        angle = (revolution + (angle_16 / 65536)) / 71.96 * 2 * math.pi
+        angle = (revolution + (angle_16 / 65536)) / 71.96 * 2 * np.pi
         # print("degree: " + str(math.degrees(angle)))
         
         return angle
@@ -256,7 +257,7 @@ class MotorManager:
         self.send_motor_cmd(motor_id, CAN_STD_TYPE.CAN_STDID_PRESENT_VELOCITY_DPS, 0)
         velocity_01 = self.motor_dict[motor_id].get_param(CMD_TYPE.PRESENT_VELOCITY_DPS)
 
-        omega = (((velocity_01 * 10) / 65536)) / 71.96 * 2 * math.pi
+        omega = (((velocity_01 * 10) / 65536)) / 71.96 * 2 * np.pi
         # print("omega: " + str(omega))
         return omega
     
