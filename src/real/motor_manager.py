@@ -146,38 +146,41 @@ class MotorManager:
         self.bus.send(send_msg)
     
     def check_message_error(self, msg: can.Message) -> bool:
+        """
+        The error is referenced from parse_err_frame in cando.py
+        """
         if msg.is_error_frame:
 
             error_code = 0
 
             # Bus Off
-            if msg.arbitration_id & 0x40:
+            if msg.arbitration_id & 0x00000040:
                 error_code |= can_config.CAN_ERR_BUSOFF
 
-            # RX/TX Warning or Passive: according to data[1]
+            # RX, TX
             if len(msg.data) > 1:
                 if msg.data[1] & 0x04:
                     error_code |= can_config.CAN_ERR_RX_TX_WARNING
                 elif msg.data[1] & 0x10:
                     error_code |= can_config.CAN_ERR_RX_TX_PASSIVE
 
-            # Stuff error
             if len(msg.data) > 2:
                 if msg.data[2] & 0x04:
                     error_code |= can_config.CAN_ERR_STUFF
                 if msg.data[2] & 0x02:
                     error_code |= can_config.CAN_ERR_FORM
 
-            # ACK error
-            if msg.arbitration_id & 0x20:
-                error_code |= can_config.CAN_ERR_ACK
-
-            if len(msg.data) > 2:
+                # Bit error
                 if msg.data[2] & 0x10:
                     error_code |= can_config.CAN_ERR_BIT_RECESSIVE
                 if msg.data[2] & 0x08:
                     error_code |= can_config.CAN_ERR_BIT_DOMINANT
 
+            # ACK error
+            if msg.arbitration_id & 0x00000020:
+                error_code |= can_config.CAN_ERR_ACK
+
+            # CRC error
             if len(msg.data) > 3:
                 if msg.data[3] & 0x08:
                     error_code |= can_config.CAN_ERR_CRC
@@ -186,13 +189,17 @@ class MotorManager:
             err_rx = int(msg.data[7]) if len(msg.data) > 7 else 0
 
             self.logger.error("CAN Error detected: code=%s", error_code)
-           
+            
             if error_code == 0:
                 self.logger.error(
-                    "Unknown CAN error frame: arbitration_id=0x%X data=%s",
+                    "Unknown CAN error frame: arbitration_id=0x%X, data_len=%d, data=%s, err_tx=%d, err_rx=%d",
                     msg.arbitration_id,
-                    msg.data.hex()
+                    len(msg.data),
+                    msg.data.hex() if msg.data else "empty",
+                    err_tx,
+                    err_rx
                 )
+                
             if error_code & can_config.CAN_ERR_BUSOFF:
                 self.logger.critical("CAN_ERR_BUSOFF")
             if error_code & can_config.CAN_ERR_RX_TX_WARNING:
