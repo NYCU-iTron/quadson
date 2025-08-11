@@ -42,7 +42,7 @@ RUN apt update && apt install -y \
 COPY requirements-can.txt /root/quadson_py/requirements-can.txt
 COPY requirements-sim.txt /root/quadson_py/requirements-sim.txt
 RUN pip3 install --no-cache-dir -r /root/quadson_py/requirements-can.txt
-RUN pip3 install --no-cache-dir -r /root/quadson_py/requirements-sim.txt
+# RUN pip3 install --no-cache-dir -r /root/quadson_py/requirements-sim.txt
 
 # Dependencies and tools
 RUN apt-get update && apt-get install -y build-essential
