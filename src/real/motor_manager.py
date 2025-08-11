@@ -34,18 +34,18 @@ class MotorManager:
 
     def connect_motors(self) -> dict[int, Motor]:
         # Create 12 motor objects
-        # Motor ID starts from 1, ends at 12
+        # Motor ID starts from 0, ends at 11
         motor_dict = {}
-        for motor_id in range(1, 13):
+        for motor_id in range(12):
             motor_dict[motor_id] = Motor(motor_id, False)
         
-        # Clear the buffer
-        for _ in range(10):
-            msg = self.bus.recv(timeout=0.001)
-
         self.logger.info("Connecting motors...")
 
-        for motor_id in range(1, 13):
+        for motor_id in range(12):
+            # Clear the buffer
+            for _ in range(10):
+                msg = self.bus.recv(timeout=0.001)
+
             # Prepare message
             can_id = 0x00 | (motor_id << can_config.ID_STD_OFFSET)
             msg = can.Message(
@@ -68,7 +68,7 @@ class MotorManager:
                     continue
 
                 # Check if the message has error
-                if self.check_message_error(self.received_message):
+                if not self.is_message_valid(self.received_message):
                     max_tries -= 1
                     continue
                 
@@ -83,7 +83,7 @@ class MotorManager:
                 connected = True
                 self.logger.info(f"Motor {motor_id} connected successfully")
 
-            motor_dict[motor_id].exist = connected
+            motor_dict[motor_id].connected = connected
             if not connected:
                 self.logger.warning(f"Failed to connect motor {motor_id} after multiple attempts")
 
@@ -115,7 +115,7 @@ class MotorManager:
             if self.received_message is None:
                 continue
 
-            if self.check_message_error(self.received_message):
+            if not self.is_message_valid(self.received_message):
                 self.error_flag = True
                 raise RuntimeError("CAN message error detected")
             
@@ -123,8 +123,8 @@ class MotorManager:
             self.motor_dict[motor_message.motor_id].update_param(motor_message)
 
     def send_motor_cmd(self, motor_id: int, cmd, value: int) -> None:
-        if self.motor_dict[motor_id].exist == False:
-            self.logger.warning(f"Motor {motor_id} does not exist, cannot send command")
+        if self.motor_dict[motor_id].connected == False:
+            self.logger.warning(f"Motor {motor_id} does not connected, cannot send command")
             return
         
         if (cmd.__class__) == can_config.CAN_STD_TYPE:
@@ -145,7 +145,7 @@ class MotorManager:
         )
         self.bus.send(send_msg)
     
-    def check_message_error(self, msg: can.Message) -> bool:
+    def is_message_valid(self, msg: can.Message) -> bool:
         """
         The error is referenced from parse_err_frame in cando.py
         """
@@ -189,7 +189,7 @@ class MotorManager:
             err_rx = int(msg.data[7]) if len(msg.data) > 7 else 0
 
             self.logger.error("CAN Error detected: code=%s", error_code)
-            
+
             if error_code == 0:
                 self.logger.error(
                     "Unknown CAN error frame: arbitration_id=0x%X, data_len=%d, data=%s, err_tx=%d, err_rx=%d",
@@ -223,9 +223,9 @@ class MotorManager:
                 self.logger.error("err_tx=%s", err_tx)
                 self.logger.error("err_rx=%s", err_rx)
 
-            return True
-        else:
             return False
+        else:
+            return True
 
     def decode_msg(self, msg: can.Message) -> MotorMessage:
         can_id = msg.arbitration_id
@@ -259,15 +259,23 @@ class MotorManager:
             pass
 
         return MotorMessage(motor_id, id_type, msg_id, value)
+    
+    def is_motor_id_valid(self, motor_id: int) -> bool:
+        if motor_id not in self.motor_dict:
+            self.logger.warning(f"Motor ID {motor_id} does not exist")
+            return False
+        
+        if not self.motor_dict[motor_id].connected:
+            self.logger.warning(f"Motor ID {motor_id} is not connected")
+            return False
+        
+        return True
 
-# # -------------------------- Motor api for leg group ------------------------- #
-    def enable_motor_torque(self, motor_id: int, enable: bool) -> None:
-        self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_TORQUE_ENABLE, enable)
-
-    def set_control_mode(self, motor_id: int, mode: int) -> None:
-        self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_CONTROL_MODE, mode)
-
+# -------------------------- Motor api for leg group ------------------------- #
     def get_zero_state(self, motor_id: int) -> int:
+        if not self.is_motor_id_valid(motor_id):
+            return None
+        
         self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_ZERO_STATE, 0)
         zero_state = self.motor_dict[motor_id].get_param(can_config.CMD_TYPE.ZERO_STATE)
         zero_state = int(zero_state)
@@ -275,36 +283,59 @@ class MotorManager:
         return zero_state
     
     def get_motor_angle(self, motor_id) -> float:
+        if not self.is_motor_id_valid(motor_id):
+            return None
+        
         self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_PRESENT_REVOLUTION, 0)
         self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_PRESENT_POSITION_DEG, 0)
         
         revolution = self.motor_dict[motor_id].get_param(can_config.CMD_TYPE.PRESENT_REVOLUTION)
         angle_16 = self.motor_dict[motor_id].get_param(can_config.CMD_TYPE.PRESENT_POSITION_DEG)
-        # print("rev: " + str(revolution) + "  angle: " + str(angle_16))
-
-        angle = (revolution + (angle_16 / 65536)) / 71.96 * 2 * np.pi
-        # print("degree: " + str(math.degrees(angle)))
         
-        return angle
+        angle = (revolution + (angle_16 / 65536)) / 71.96 * 2 * np.pi
 
+        return angle
+    
     def get_motor_omega(self, motor_id) -> float:
+        if not self.is_motor_id_valid(motor_id):
+            return None
+                
         self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_PRESENT_VELOCITY_DPS, 0)
         velocity_01 = self.motor_dict[motor_id].get_param(can_config.CMD_TYPE.PRESENT_VELOCITY_DPS)
 
         omega = (((velocity_01 * 10) / 65536)) / 71.96 * 2 * np.pi
-        # print("omega: " + str(omega))
         return omega
+    
+    def enable_motor_torque(self, motor_id: int, enable: bool) -> None:
+        if not self.is_motor_id_valid(motor_id):
+            return
+        
+        self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_TORQUE_ENABLE, enable)
+
+    def set_control_mode(self, motor_id: int, mode: int) -> None:
+        if not self.is_motor_id_valid(motor_id):
+            return
+        
+        self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_CONTROL_MODE, mode)
 
     def set_motor_angle(self, motor_id: int, angle) -> None:
+        if not self.is_motor_id_valid(motor_id):
+            return
+        
         can_signal = int(round(angle * 32768 / np.pi))
         self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_GOAL_POSITION_DEG, can_signal)
     
     def set_motor_omega(self, motor_id: int, omega) -> None:
+        if not self.is_motor_id_valid(motor_id):
+            return
+        
         can_signal = int(round(omega * 32768 / np.pi))
         self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_GOAL_VELOCITY_DPS, can_signal)
 
-    
     def stop_motor(self, motor_id: int) -> None:
+        if not self.is_motor_id_valid(motor_id):
+            return
+        
         self.set_motor_omega(motor_id, 0)
         self.set_control_mode(motor_id, 0)
         self.enable_motor_torque(motor_id, False)
