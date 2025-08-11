@@ -11,10 +11,11 @@ class MotorManager:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-        self.device = None
+        self.bus = None
         self.received_message = can.Message()
+        self.error_flag = False
 
-        self.bus = self.connect_can_device()
+        self.bus = self.connect_can_bus()
         self.motor_dict = self.connect_motors()
 
         self.thread_pause_event = threading.Event()
@@ -26,7 +27,7 @@ class MotorManager:
         self.thread_pause_event.set() # Set auto receive
 
 # -------------------------- CAN and Thread methods -------------------------- #
-    def connect_can_device(self):
+    def connect_can_bus(self):
         bus = can.interface.Bus(bustype='socketcan', channel='can0', bitrate=500000)
         self.logger.info("CAN device connected")
         return bus
@@ -115,7 +116,7 @@ class MotorManager:
                 continue
 
             if self.check_message_error(self.received_message):
-                self.shutdown()
+                self.error_flag = True
                 raise RuntimeError("CAN message error detected")
             
             motor_message = self.decode_msg(self.received_message)
@@ -185,7 +186,13 @@ class MotorManager:
             err_rx = int(msg.data[7]) if len(msg.data) > 7 else 0
 
             self.logger.error("CAN Error detected: code=%s", error_code)
-
+           
+            if error_code == 0:
+                self.logger.error(
+                    "Unknown CAN error frame: arbitration_id=0x%X data=%s",
+                    msg.arbitration_id,
+                    msg.data.hex()
+                )
             if error_code & can_config.CAN_ERR_BUSOFF:
                 self.logger.critical("CAN_ERR_BUSOFF")
             if error_code & can_config.CAN_ERR_RX_TX_WARNING:
@@ -290,3 +297,7 @@ class MotorManager:
         self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_GOAL_VELOCITY_DPS, can_signal)
 
     
+    def stop_motor(self, motor_id: int) -> None:
+        self.set_motor_omega(motor_id, 0)
+        self.set_control_mode(motor_id, 0)
+        self.enable_motor_torque(motor_id, False)
