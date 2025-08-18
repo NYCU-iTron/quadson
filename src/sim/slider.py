@@ -8,8 +8,8 @@ class Slider:
         self.logger = logging.getLogger(__name__)
 
         function_map = {
-            CommandType.MOTOR_ANGLE: (self.init_motor_angle_slider, self.get_motor_angle_command),
-            CommandType.EE_POINT: (self.init_ee_point_slider, self.get_ee_point_command),
+            CommandType.MOTOR_ANGLES: (self.init_motor_angle_slider, self.get_motor_angle_command),
+            CommandType.EE_POINTS: (self.init_ee_point_slider, self.get_ee_point_command),
             CommandType.ORIENTATION: (self.init_orientation_slider, self.get_orientation_command),
         }
 
@@ -55,7 +55,7 @@ class Slider:
             data[name] = motor_angles
         
         command = Command(
-            type=CommandType.MOTOR_ANGLE,
+            type=CommandType.MOTOR_ANGLES,
             data=data
         )
         return command
@@ -71,7 +71,7 @@ class Slider:
             data[name] = ee_point
         
         command = Command(
-            type=CommandType.EE_POINT,
+            type=CommandType.EE_POINTS,
             data=data
         )
         return command
