@@ -1,94 +1,69 @@
 import pybullet as p
 import numpy as np
-from typing import Dict
 from pathlib import Path
-from common.config import Config
+import logging
+from common.config import LegName, GaitType, CommandType, Command
 from common.body_kinematics import BodyKinematics
 from common.locomotion import Locomotion
-from sim.interface import Interface
-from sim.leg_group import LegGroup
+from sim.leg import Leg
+from sim.motor_manager import MotorManager
 
 class Quadson:
-    def __init__(self, interface: Interface = None):
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        
+        # Load the mesh
         urdf_path = Path(__file__).resolve().parent.parent.parent / "assets/whole_body/urdf/quadson_modified.urdf"
         self.robot_id = p.loadURDF(
             str(urdf_path),
             basePosition=[0, 0, 0.2],
-            useFixedBase=False)
-        self.config = Config()
+            useFixedBase=False
+        )
+
+        self.locomotion = Locomotion(GaitType.TROT)
         self.body_kinematics = BodyKinematics()
-        self.locomotion = Locomotion(gait_type='trot')
-        self.interface = interface
-        self.joint_dict = self.setup_joint_dict()
-        self.leg_group_dict = self.setup_leg_group()
+        self.motor_manager = MotorManager(self.robot_id)
+        
+        self.leg_dict = {}
+        for leg_name in LegName:
+            self.leg_dict[leg_name] = Leg(leg_name, self.motor_manager)
+
+        self.sim_time = 0
+        self.time_step = 1 / 240
+        self.linear_vel = [0, 0, 0]
+        self.robot_state = None
+
         self.setup_colors()
         self.setup_friction()
 
-        self.sim_time = 0
-        self.time_step = 1/240
-        self.linear_vel = [0, 0, 0]
+    def setup_friction(self) -> None:
+        joint2s = [2, 7, 12, 17]
+        for joint_id in joint2s: 
+            p.changeDynamics(
+                self.robot_id, 
+                joint_id,
+                lateralFriction = 1.0,
+                spinningFriction = 0.1,
+                rollingFriction = 0.03
+            )
 
-        self.cmd_handlers = {
-            'motor': self._update_motor,
-            'orientation': self._update_orientation,
-            'ee_offset': self._update_ee_offset, # PPO model input
-        }
-
-    def setup_joint_dict(self) -> Dict:
-        """
-        Return a dictionary of joint names and their indices
-        """
-        joint_dict = {
-            p.getJointInfo(self.robot_id, i)[1].decode("utf-8"): i
-            for i in range(p.getNumJoints(self.robot_id))
-        }
-        return joint_dict
-    
     def setup_colors(self) -> None:
         base_color = [0.2, 0.2, 0.2, 1]
         shoulder_color = [0.8, 0.5, 0.2, 1]
         leg_color = [0.7, 0.7, 0.7, 1]
-        default_color = [0.2, 0.2, 0.2, 1] # Dark gray for anything else
 
         # Set base link color
         p.changeVisualShape(self.robot_id, -1, rgbaColor=base_color)
 
         # Iterate through all links
-        for joint_name, joint_index in self.joint_dict.items():
-            if 'joint0' in joint_name.lower():
-                color = shoulder_color
-            elif 'joint' in joint_name.lower():
-                color = leg_color
+        joint0s = [0, 5, 10, 15]
+        for joint_index in range(20):
+            if joint_index in joint0s:
+                p.changeVisualShape(self.robot_id, joint_index, rgbaColor=shoulder_color)
             else:
-                color = default_color
+                p.changeVisualShape(self.robot_id, joint_index, rgbaColor=leg_color)
 
-            p.changeVisualShape(self.robot_id, joint_index, rgbaColor=color)
-
-    def setup_friction(self) -> None:
-        for joint_name, joint_index in self.joint_dict.items():
-            if 'joint2' in joint_name.lower():
-                p.changeDynamics(self.robot_id, joint_index,
-                                    lateralFriction=1.0,
-                                    spinningFriction=0.1,
-                                    rollingFriction=0.03)
-                
-    def setup_leg_group(self) -> Dict:
-        """
-        Initialize leg groups dynamically from joint dictionary.
-        Return a dictionary of leg name and the leg group object.
-        """
-        leg_group_dict = {}
-        for leg_name, leg_joints in self.config.joint_dict.items():
-            if not all(joint in self.joint_dict for joint in leg_joints):
-                print(f"[Warning] Skipping {leg_name} leg group. Some joints are missing in URDF.")
-                continue
-            joint_indices = [self.joint_dict[joint_name] for joint_name in leg_joints]
-            leg_group_dict[leg_name] = LegGroup(self.robot_id, joint_indices)
-        
-        return leg_group_dict
-
-    def update(self, cmd_dict=None) -> None:
-        # ----------------------------- Update the state ----------------------------- #
+    def update_state(self) -> None:
         self.sim_time += self.time_step
         self.prev_linear_vel = self.linear_vel
         self.linear_vel, self.angular_vel = p.getBaseVelocity(self.robot_id)
@@ -99,42 +74,41 @@ class Quadson:
         ]
         self.pos, self.ori = p.getBasePositionAndOrientation(self.robot_id)
         self.euler_ori = p.getEulerFromQuaternion(self.ori)
+        
+    def process_command(self, command: Command) -> None:
+        if command.type == CommandType.MOTOR_ANGLES:
+            for name, motor_angles in command.data.items():
+                if name not in self.leg_dict:
+                    self.logger.error(f"Invalid leg name: {name}")
+                    continue
+                self.leg_dict[name].set_motor_angles(motor_angles)
 
-        # ---------------------------- Process the command --------------------------- #
-        if cmd_dict != None:
-            self.interface.send_cmd(cmd_dict)
+        elif command.type == CommandType.EE_POINTS:
+            for name, ee_point in command.data.items():
+                if name not in self.leg_dict:
+                    self.logger.error(f"Invalid leg name: {name}")
+                    continue
+                self.leg_dict[name].set_ee_point(ee_point)
+
+        elif command.type == CommandType.ORIENTATION:
+            pass
+
+        elif command.type == CommandType.TEST_LOCOMOTION:
+            ee_points = self.locomotion.get_ee_points(self.robot_state.time)
+            ee_offsets = self.get_model_calibration(self.robot_state)
+            # ...
+
+        elif command.type == CommandType.TWIST:
+            pass
+
         else:
-            self.interface.send_cmd()
-
-        self.input_dict = self.interface.output_dict[self.interface.target]
-        self.cmd_handlers[self.interface.target]()
-
-    def step(self, time: float) -> None:
-        ee_points = self.locomotion.get_ee_points(time)
-        for leg_name, ee_point in ee_points.items():
-            self.leg_group_dict[leg_name].set_ee_point(ee_point)
-
-    def _update_motor(self) -> None:
-        base_angles = np.array([0, np.pi, np.pi/2])
-        for leg_name in self.config.legs:
-            motor_angles = base_angles - np.array(self.input_dict[leg_name])
-            self.leg_group_dict[leg_name].set_motor_angles(motor_angles)
-
-    def _update_orientation(self) -> None:
-        [roll, pitch, yaw] = [value for _, value in self.input_dict.items()]
-        self.body_kinematics.update_body_pose(roll, pitch, yaw)
-        ee_points = self.body_kinematics.get_ee_points()
-        for leg_name, ee_point in zip(self.config.legs, ee_points):
-            self.leg_group_dict[leg_name].set_ee_point(ee_point)
-
-    def _update_ee_offset(self) -> None:
-        ee_points = self.locomotion.get_ee_points(self.sim_time)
-        for leg_name, ee_point in ee_points.items():
-            offset = self.input_dict[leg_name]
-            self.leg_group_dict[leg_name].set_ee_point(ee_point+offset)
+            self.logger.error("Wrong input command type")
+    
+    def get_model_calibration(self, robot_state) -> dict:
+        pass
 
 # ------------------------------- PPO Training ------------------------------- #
-    def get_observation(self) -> Dict:
+    def get_observation(self) -> dict:
         # Get body state
         self.linear_vel, self.angular_vel = p.getBaseVelocity(self.robot_id)
         self.pos, self.ori = p.getBasePositionAndOrientation(self.robot_id)
@@ -149,21 +123,21 @@ class Quadson:
 
         # Get joint state
         joints = []
-        for leg_name in self.config.legs:
-            motor_angles = self.leg_group_dict[leg_name].get_motor_angles()
+        for name in LegName:
+            motor_angles = self.leg_dict[name].get_motor_angles()
             joints.extend(motor_angles)
         joints = np.array(joints)
 
         # Get phase
         phase = self.locomotion.get_current_phase(self.sim_time)
         phase_list = []
-        for leg in self.config.legs:
-            phase_list.append(np.sin(phase[leg]))
-            phase_list.append(np.cos(phase[leg]))
+        for name in LegName:
+            phase_list.append(np.sin(phase[name.value]))
+            phase_list.append(np.cos(phase[name.value]))
         phase_list = np.array(phase_list)
 
-        obs = np.concatenate([euler_ori, linear_vel, angular_vel, joints, phase_list])
-        return obs
+        observation = np.concatenate([euler_ori, linear_vel, angular_vel, joints, phase_list])
+        return observation
     
     def get_angular_velocity(self) -> tuple:
         return self.angular_vel
