@@ -134,8 +134,8 @@ class MotorManager:
             arbitration_id |= can_config.CANDO_ID_EXTENDED
             
         dlc = 2
-        value = int(value)
-        data = [value >> 8, value & 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+        value = int(value) & 0xFFFF
+        data = [(value >> 8) & 0xFF, value & 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
         send_msg = can.Message(
             arbitration_id=arbitration_id,
@@ -292,7 +292,7 @@ class MotorManager:
         revolution = self.motor_dict[motor_id].get_param(can_config.CMD_TYPE.PRESENT_REVOLUTION)
         angle_16 = self.motor_dict[motor_id].get_param(can_config.CMD_TYPE.PRESENT_POSITION_DEG)
         
-        angle = (revolution + (angle_16 / 65536)) / 71.96 * 2 * np.pi
+        angle = -(revolution + (angle_16 / 65536)) / 71.96 * 2 * np.pi
 
         return angle
     
