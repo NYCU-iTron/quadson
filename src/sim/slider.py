@@ -24,18 +24,34 @@ class Slider:
     def init_motor_angle_slider(self) -> None:
         self.sliders = {}
         for name in LegName:
-            for i in range(3):
-                id = 3 * name.value + i
-                slider_id = p.addUserDebugParameter(str(id), -np.pi, np.pi, 0)
-                self.sliders[id] = slider_id
+            leg_id = 3 * name.value
+            id_0 = leg_id + 0
+            id_1 = leg_id + 1
+            id_2 = leg_id + 2
+
+            slider_id_0 = p.addUserDebugParameter(str(id_0), -np.pi, np.pi, 0)
+            slider_id_1 = p.addUserDebugParameter(str(id_1), 0, 2 * np.pi, np.pi)
+            slider_id_2 = p.addUserDebugParameter(str(id_2), -np.pi / 2, 3 * np.pi / 2, np.pi / 2)
+
+            self.sliders[id_0] = slider_id_0
+            self.sliders[id_1] = slider_id_1
+            self.sliders[id_2] = slider_id_2
 
     def init_ee_point_slider(self) -> None:
         self.sliders = {}
         for name in LegName:
-            for i in range(3): # x, y, z
-                id = 3 * name.value + i
-                slider_id = p.addUserDebugParameter(str(id), -np.pi, np.pi, 0)
-                self.sliders[id] = slider_id
+            leg_id = 3 * name.value
+            id_0 = leg_id + 0
+            id_1 = leg_id + 1
+            id_2 = leg_id + 2
+
+            slider_id_0 = p.addUserDebugParameter(str(id_0), -5, 20, -2.16)
+            slider_id_1 = p.addUserDebugParameter(str(id_1), -30, 0, -17.03)
+            slider_id_2 = p.addUserDebugParameter(str(id_2), -10, 10, 0)
+
+            self.sliders[id_0] = slider_id_0
+            self.sliders[id_1] = slider_id_1
+            self.sliders[id_2] = slider_id_2
 
     def init_orientation_slider(self) -> None:
         self.sliders = {
