@@ -3,8 +3,7 @@ import time
 import numpy as np
 from pathlib import Path
 from common.leg_kinematics import LegKinematics
-
-urdf_path = Path(__file__).resolve().parent.parent.parent / "assets/single_leg/urdf/single_leg.urdf"
+from common.logging_config import setup_logging
 
 def joint_ctrl(joint_index, target_angle):
     p.setJointMotorControl2(
@@ -28,42 +27,51 @@ def enfore_closure(theory_angles):
     joint_ctrl(3, j4_env)
     joint_ctrl(2, j5_env)
 
-p.connect(p.GUI)
-p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
-p.setGravity(0, 0, -9.81)
-robot_id = p.loadURDF(str(urdf_path), useFixedBase=True)
-time_step = 1.0 / 240.0
-p.setRealTimeSimulation(0)
-kinematics = LegKinematics(DEBUG=True)
+if __name__ == "__main__":
+    setup_logging()
 
-# Joint info
-# for i in range(p.getNumJoints(robot_id)):
-#   print(i, p.getJointInfo(robot_id, i)[1].decode("utf-8"))
+    p.connect(p.GUI)
+    p.setGravity(0, 0, -9.81)
+    p.setRealTimeSimulation(0)
 
-x_id = p.addUserDebugParameter("x", -5, 20, -2.16399823)
-y_id = p.addUserDebugParameter("y", -20, -10, -17.02765643)
-# j1_id = p.addUserDebugParameter("j1", 0, np.pi, np.pi)
-# j5_id = p.addUserDebugParameter("j5", 0, np.pi, np.pi/2)
+    urdf_path = Path(__file__).resolve().parent.parent.parent / "assets/single_leg/urdf/single_leg.urdf"
+    robot_id = p.loadURDF(str(urdf_path), useFixedBase=True)
+    time_step = 1.0 / 240.0
 
-for t in range(10000):
-    x = p.readUserDebugParameter(x_id)
-    y = p.readUserDebugParameter(y_id)
-    ee_point = [x, y, 0]
-    kinematics.set_ee_point(ee_point)
+    # Fixed camera position relative to the robot
+    base_pos, _ = p.getBasePositionAndOrientation(robot_id)
+    p.resetDebugVisualizerCamera(cameraDistance=0.8, cameraYaw=180, cameraPitch=-20, cameraTargetPosition=base_pos)
 
-    # j1 = p.readUserDebugParameter(j1_id)
-    # j5 = p.readUserDebugParameter(j5_id)
-    # kinematics.set_motor_angles([0, j1, j5])
-    # ee_point = kinematics.get_ee_point()
+    kinematics = LegKinematics()
 
-    theory_angles = kinematics.get_angles()
-    enfore_closure(theory_angles)
+    # Joint info
+    # for i in range(p.getNumJoints(robot_id)):
+    #   print(i, p.getJointInfo(robot_id, i)[1].decode("utf-8"))
 
-    p.stepSimulation()
-    time.sleep(time_step)
+    x_id = p.addUserDebugParameter("x", -5, 20, -2.16399823)
+    y_id = p.addUserDebugParameter("y", -20, -10, -17.02765643)
+    # j1_id = p.addUserDebugParameter("j1", 0, np.pi, np.pi)
+    # j5_id = p.addUserDebugParameter("j5", 0, np.pi, np.pi/2)
 
-while True:
-    p.stepSimulation()
-    time.sleep(time_step)
+    for t in range(10000):
+        x = p.readUserDebugParameter(x_id)
+        y = p.readUserDebugParameter(y_id)
+        ee_point = [x, y, 0]
+        kinematics.set_ee_point(ee_point)
 
-# p.disconnect()
+        # j1 = p.readUserDebugParameter(j1_id)
+        # j5 = p.readUserDebugParameter(j5_id)
+        # kinematics.set_motor_angles([0, j1, j5])
+        # ee_point = kinematics.get_ee_point()
+
+        theory_angles = kinematics.get_joint_angles()
+        enfore_closure(theory_angles)
+
+        p.stepSimulation()
+        time.sleep(time_step)
+
+    while True:
+        p.stepSimulation()
+        time.sleep(time_step)
+
+    # p.disconnect()
