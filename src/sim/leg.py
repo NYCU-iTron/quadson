@@ -5,17 +5,17 @@ from common.leg_kinematics import LegKinematics
 from sim.motor_manager import MotorManager
 
 class Leg:
-    def __init__(self, leg_name: LegName, motor_manager: MotorManager):
+    def __init__(self, name: LegName, motor_manager: MotorManager):
         self.logger = logging.getLogger(__name__)
 
         self.motor_manager = motor_manager
-        self.leg_name = leg_name
+        self.name = name
         self.motor_indices = [
-            5 * leg_name.value + 0,  # Motor 0
-            5 * leg_name.value + 1,  # Motor 1
-            5 * leg_name.value + 2,  # Motor 2
-            5 * leg_name.value + 4,  # Motor 4
-            5 * leg_name.value + 3,  # Motor 5
+            5 * name.value + 0,  # Motor 0
+            5 * name.value + 1,  # Motor 1
+            5 * name.value + 2,  # Motor 2
+            5 * name.value + 4,  # Motor 4
+            5 * name.value + 3,  # Motor 5
         ]
 
         self.leg_kinematics = LegKinematics()
