@@ -1,71 +1,71 @@
 import numpy as np
-from typing import Dict, List
-from common.config import Config
+import logging
+from common.config import LegName, GaitType
 
 class Locomotion:
     """
     A class to perform locomotion calculations for a quadruped robot.
     """
-    PHASE_OFFSETS = {
-        'walk': {'fl': 0.0, 'fr': 0.5, 'rl': 0.25, 'rr': 0.75},
-        'trot': {'fl': 0.0, 'fr': 0.5, 'rl': 0.5, 'rr': 0.0},
-        'pace': {'fl': 0.0, 'fr': 0.0, 'rl': 0.5, 'rr': 0.5},
-        'bound': {'fl': 0.0, 'fr': 0.0, 'rl': 0.5, 'rr': 0.5},
-        'gallop': {'fl': 0.1, 'fr': 0.25, 'rl': 0.6, 'rr': 0.75},
+    phase_offsets = {
+        GaitType.WALK: {LegName.FRONT_LEFT: 0.0, LegName.FRONT_RIGHT: 0.5, LegName.REAR_LEFT: 0.25, LegName.REAR_RIGHT: 0.75},
+        GaitType.TROT: {LegName.FRONT_LEFT: 0.0, LegName.FRONT_RIGHT: 0.5, LegName.REAR_LEFT: 0.5, LegName.REAR_RIGHT: 0.0},
+        GaitType.PACE: {LegName.FRONT_LEFT: 0.0, LegName.FRONT_RIGHT: 0.0, LegName.REAR_LEFT: 0.5, LegName.REAR_RIGHT: 0.5},
+        GaitType.BOUND: {LegName.FRONT_LEFT: 0.0, LegName.FRONT_RIGHT: 0.0, LegName.REAR_LEFT: 0.5, LegName.REAR_RIGHT: 0.5},
+        GaitType.GALLOP: {LegName.FRONT_LEFT: 0.1, LegName.FRONT_RIGHT: 0.25, LegName.REAR_LEFT: 0.6, LegName.REAR_RIGHT: 0.75},
     }
-    VALID_GAIT_TYPES = list(PHASE_OFFSETS.keys())
-    
-    CYCLE_TIMES = {
-        'walk': 1.2,
-        'trot': 0.8,
-        'pace': 0.7,
-        'bound': 0.6,
-        'gallop': 0.5
+
+    cycle_times = {
+        GaitType.WALK: 1.2,
+        GaitType.TROT: 0.8,
+        GaitType.PACE: 0.7,
+        GaitType.BOUND: 0.6,
+        GaitType.GALLOP: 0.5
     }
         
-    DUTY_FACTORS = {
-        'walk': 0.75,
-        'trot': 0.5,
-        'pace': 0.5,
-        'bound': 0.4,
-        'gallop': 0.35
+    duty_factors = {
+        GaitType.WALK: 0.75,
+        GaitType.TROT: 0.5,
+        GaitType.PACE: 0.5,
+        GaitType.BOUND: 0.4,
+        GaitType.GALLOP: 0.35
     }
 
-    STEP_HEIGHTS = {
-        'walk': 3.0,
-        'trot': 5.0,
-        'pace': 5.0,
-        'bound': 8.0,
-        'gallop': 7.0
+    step_heights = {
+        GaitType.WALK: 3.0,
+        GaitType.TROT: 5.0,
+        GaitType.PACE: 5.0,
+        GaitType.BOUND: 8.0,
+        GaitType.GALLOP: 7.0
     }
     
-    STEP_LENGTHS = {
-        'walk': 8.0,
-        'trot': 12.0,
-        'pace': 12.0,
-        'bound': 16.0,
-        'gallop': 21.0
+    step_lengths = {
+        GaitType.WALK: 8.0,
+        GaitType.TROT: 12.0,
+        GaitType.PACE: 12.0,
+        GaitType.BOUND: 16.0,
+        GaitType.GALLOP: 21.0
     }
 
-    def __init__(self, gait_type: str = 'trot'):
+    def __init__(self, gait_type: GaitType = GaitType.TROT):
         """
         Initialize the Locomotion class with a specified gait type.
 
         :param gait_type: The type of gait to be used. Must be one of 'walk', 'trot', 'pace', 'bound', or 'gallop'.
         """
-        if gait_type not in self.VALID_GAIT_TYPES:
-            print(f"[Warning] Invalid gait type: {gait_type}, using trot as default")
-            gait_type = 'trot'
-
-        self.config = Config()
+        self.logger = logging.getLogger(__name__)
+        
+        if gait_type not in self.phase_offsets:
+            self.logger.warning(f"Invalid gait type: {gait_type}, using trot as default")
+            gait_type = GaitType.TROT
+        
         self.gait_type = gait_type
-        self.phase_dict = self.PHASE_OFFSETS[gait_type]
-        self.duty_factor = self.DUTY_FACTORS[gait_type]
-        self.cycle_time = self.CYCLE_TIMES[gait_type]
-        self.step_height = self.STEP_HEIGHTS[gait_type]
-        self.step_length = self.STEP_LENGTHS[gait_type]
+        self.phase_dict = self.phase_offsets[gait_type]
+        self.duty_factor = self.duty_factors[gait_type]
+        self.cycle_time = self.cycle_times[gait_type]
+        self.step_height = self.step_heights[gait_type]
+        self.step_length = self.step_lengths[gait_type]
     
-    def get_current_phase(self, time: float) -> Dict[str, float]:
+    def get_current_phase(self, time: float) -> dict[int, float]:
         """
         Get the phase of each leg based on the current time.
 
@@ -74,11 +74,11 @@ class Locomotion:
         """
         phase_dict = {}
         cycle_progress = (time % self.cycle_time) / self.cycle_time
-        for leg_name in self.config.legs:
-            phase_dict[leg_name] = (cycle_progress + self.phase_dict[leg_name]) % 1.0
+        for leg_id in LegName:
+            phase_dict[leg_id] = (cycle_progress + self.phase_dict[leg_id]) % 1.0
         return phase_dict
     
-    def get_ee_points(self, time: float) -> Dict[str, List[float]]:
+    def get_ee_points(self, time: float) -> dict[int, list[float]]:
         """
         Get the end-effector points for each leg based on the current time.
 
@@ -89,13 +89,13 @@ class Locomotion:
         ee_points = {}
         base_y = -20.0
         
-        for leg_name in self.config.legs:
-            direction = 1 if leg_name in ['fl', 'fr'] else -1
-            start_x = -4.0 if leg_name in ['fl', 'fr'] else 13.0
+        for leg_id in LegName:
+            direction = 1 if leg_id in [LegName.FRONT_LEFT, LegName.FRONT_RIGHT] else -1
+            start_x = -4.0 if leg_id in [LegName.FRONT_LEFT, LegName.FRONT_RIGHT] else 13.0
             
             # Stance phase
-            if phase_dict[leg_name] < self.duty_factor:
-                t = phase_dict[leg_name] / self.duty_factor # map to 0-1
+            if phase_dict[leg_id] < self.duty_factor:
+                t = phase_dict[leg_id] / self.duty_factor # map to 0-1
                 p_start = np.array([start_x, base_y])
                 p_end = np.array([start_x + direction * self.step_length, base_y])
                 p = p_start + (p_end - p_start) * t
@@ -103,19 +103,18 @@ class Locomotion:
             
             # Swing phase
             else:
-                t = (phase_dict[leg_name] - self.duty_factor) / (1 - self.duty_factor) # map to 0-1
+                t = (phase_dict[leg_id] - self.duty_factor) / (1 - self.duty_factor) # map to 0-1
                 p0 = (start_x + direction * self.step_length, base_y)  # end
                 p1 = (start_x + direction * self.step_length / 2, base_y + self.step_height)  # control point 2
                 p2 = (start_x, base_y + self.step_height / 2)  # control point 1
                 p3 = (start_x, base_y)  # start
-                x, y = self._cubic_bezier(t, p0, p1, p2, p3)
+                x, y = self.cubic_bezier(t, p0, p1, p2, p3)
                 
-            ee_points[leg_name] = [x, y, 0.0]  # z is always 0.0
+            ee_points[leg_id] = [x, y, 0.0]  # z is always 0.0
             
         return ee_points
     
-    @staticmethod
-    def _cubic_bezier(t: float, p0: tuple[float, float], p1: tuple[float, float], 
+    def cubic_bezier(self, t: float, p0: tuple[float, float], p1: tuple[float, float], 
                                         p2: tuple[float, float], p3: tuple[float, float]) -> tuple[float, float]:
         """
         Calculate position on a cubic Bezier curve.
