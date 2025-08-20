@@ -1,8 +1,10 @@
 import pybullet as p
+from stable_baselines3 import PPO
 import numpy as np
 from pathlib import Path
+from copy import deepcopy
 import logging
-from common.config import LegName, GaitType, CommandType, Command
+from common.config import LegName, GaitType, CommandType, Command, RobotState
 from common.body_kinematics import BodyKinematics
 from common.locomotion import Locomotion
 from sim.leg import Leg
@@ -20,18 +22,24 @@ class Quadson:
             useFixedBase=False
         )
 
+        # Initialize components
         self.locomotion = Locomotion(GaitType.TROT)
         self.body_kinematics = BodyKinematics()
         self.motor_manager = MotorManager(self.robot_id)
         
+        # Initialize legs
         self.leg_dict = {}
-        for leg_name in LegName:
-            self.leg_dict[leg_name] = Leg(leg_name, self.motor_manager)
+        for name in LegName:
+            self.leg_dict[name] = Leg(name, self.motor_manager)
 
-        self.sim_time = 0
         self.time_step = 1 / 240
-        self.linear_vel = [0, 0, 0]
-        self.robot_state = None
+
+        # Initialize robot state
+        self.prev_robot_state = None
+        self.robot_state = RobotState(
+            time = 0,
+            linear_velocity=[0, 0, 0],
+        )
 
         self.setup_colors()
         self.setup_friction()
@@ -64,30 +72,24 @@ class Quadson:
                 p.changeVisualShape(self.robot_id, joint_index, rgbaColor=leg_color)
 
     def update_state(self) -> None:
-        self.sim_time += self.time_step
-        self.prev_linear_vel = self.linear_vel
-        self.linear_vel, self.angular_vel = p.getBaseVelocity(self.robot_id)
-        self.linear_acc = [
-            (self.linear_vel[0] - self.prev_linear_vel[0]) / self.time_step,
-            (self.linear_vel[1] - self.prev_linear_vel[1]) / self.time_step,
-            (self.linear_vel[2] - self.prev_linear_vel[2]) / self.time_step
+        self.prev_robot_state = deepcopy(self.robot_state)
+        self.robot_state.time = self.prev_robot_state.time + self.time_step
+        self.robot_state.linear_velocity, self.robot_state.angular_velocity = p.getBaseVelocity(self.robot_id)
+
+        self.robot_state.linear_accleration = [
+            (current - previous) / self.time_step
+            for current, previous in zip(self.robot_state.linear_velocity, self.prev_robot_state.linear_velocity)
         ]
-        self.pos, self.ori = p.getBasePositionAndOrientation(self.robot_id)
-        self.euler_ori = p.getEulerFromQuaternion(self.ori)
+        self.robot_state.pose, self.robot_state.orientation = p.getBasePositionAndOrientation(self.robot_id)
+        self.robot_state.euler_orientation = p.getEulerFromQuaternion(self.robot_state.orientation)
         
     def process_command(self, command: Command) -> None:
         if command.type == CommandType.MOTOR_ANGLES:
             for name, motor_angles in command.data.items():
-                if name not in self.leg_dict:
-                    self.logger.error(f"Invalid leg name: {name}")
-                    continue
                 self.leg_dict[name].set_motor_angles(motor_angles)
 
         elif command.type == CommandType.EE_POINTS:
             for name, ee_point in command.data.items():
-                if name not in self.leg_dict:
-                    self.logger.error(f"Invalid leg name: {name}")
-                    continue
                 self.leg_dict[name].set_ee_point(ee_point)
 
         elif command.type == CommandType.ORIENTATION:
@@ -95,8 +97,20 @@ class Quadson:
 
         elif command.type == CommandType.TEST_LOCOMOTION:
             ee_points = self.locomotion.get_ee_points(self.robot_state.time)
+            for name, ee_point in ee_points.items():
+                self.leg_dict[name].set_ee_point(ee_point)
+
+        elif command.type == CommandType.TEST_MODEL_CALIBRATION:            
+            ee_points = self.locomotion.get_ee_points(self.robot_state.time)
             ee_offsets = self.get_model_calibration(self.robot_state)
-            # ...
+            
+            for name, ee_point in ee_points.items():
+                # Apply the model calibration offsets
+                calibrated_ee_point = np.array(ee_point) + np.array(ee_offsets[name])
+                self.leg_dict[name].set_ee_point(calibrated_ee_point)
+        
+        elif command.type == CommandType.TRAIN_MODEL:
+            pass
 
         elif command.type == CommandType.TWIST:
             pass
@@ -104,9 +118,51 @@ class Quadson:
         else:
             self.logger.error("Wrong input command type")
     
-    def get_model_calibration(self, robot_state) -> dict:
-        pass
+    def load_model(self, model_path: str) -> None:
+        model_path = Path(__file__).resolve().parent.parent.parent / "assets/" / model_path
+        self.model = PPO.load(model_path, device='cpu', print_system_info=True)
 
+    def get_model_calibration(self, robot_state: RobotState) -> dict:
+        if not hasattr(self, 'model') or self.model is None:
+            self.logger.error("Model not loaded.")
+            return None
+        
+        # Get joint state
+        joints = []
+        for name in LegName:
+            motor_angles = self.leg_dict[name].get_motor_angles()
+            joints.extend(motor_angles)
+        joints = np.array(joints)
+
+        # Get phase
+        phase = self.locomotion.get_current_phase(self.robot_state.time)
+        phase_list = []
+        for name in LegName:
+            phase_list.append(np.sin(phase[name.value]))
+            phase_list.append(np.cos(phase[name.value]))
+        phase_list = np.array(phase_list)
+
+        observation = np.concatenate([
+            robot_state.euler_orientation,
+            robot_state.linear_velocity,
+            robot_state.angular_velocity,
+            joints,
+            phase_list
+        ])
+
+        action, _ = self.model.predict(observation, deterministic=True)
+
+        ee_offsets = {}
+        for name in LegName:
+            start = name.value * 3
+            end = start + 3
+            ee_offsets[name] = action[start:end].tolist()
+
+        return ee_offsets
+    
+    def round_tuple(self, tuple, digits) -> tuple:
+        return tuple(round(x, digits) for x in tuple)
+    
 # ------------------------------- PPO Training ------------------------------- #
     def get_observation(self) -> dict:
         # Get body state
@@ -139,18 +195,5 @@ class Quadson:
         observation = np.concatenate([euler_ori, linear_vel, angular_vel, joints, phase_list])
         return observation
     
-    def get_angular_velocity(self) -> tuple:
-        return self.angular_vel
-    
-    def get_linear_velocity(self) -> tuple:
-        return self.linear_vel
-    
-    def get_orientation_rpy(self) -> tuple:
-        return self.euler_ori
-    
-    def get_position(self) -> tuple:
-        return self.pos
-    
-    def round_tuple(self, t, digits) -> tuple:
-        return tuple(round(x, digits) for x in t)
+
     

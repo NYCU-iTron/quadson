@@ -1,52 +1,45 @@
 import pybullet as p
 import pybullet_data
+import logging
 import time
+from common.logging_config import setup_logging
+from common.config import Command, CommandType
 from sim.quadson import Quadson
-from analyze_stability import analyze_stability, plot_stability
 
 def main():
+    logger = logging.getLogger(__name__)
+
     dt = 1 / 240
     current_time = 0.0
     
-    p.connect(p.GUI) # (GUI for visualization, DIRECT for headless)
-    p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
+    p.connect(p.GUI)
     p.resetSimulation()
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.setGravity(0, 0, -9.81)
     p.setTimeStep(dt)
     p.loadURDF("plane.urdf")
-    
+
     quadson = Quadson()
 
-    observations = {
-        'pos': [],
-        'euler_ori': [],
-        'linear_vel': [],
-    }
-    times = []
-    steps = 960
-    for step in range(steps):
-        quadson.step(current_time)
-        p.stepSimulation()
+    try:
+        while True:
+            p.stepSimulation()
 
-        if step > 240:
-            # Get observation
-            obs = quadson.get_observation()
-            euler_ori = obs[0:3]  # roll, pitch, yaw
-            linear_vel = obs[3:6]  # x, y, z velocity
-            pos, _ = p.getBasePositionAndOrientation(quadson.robot_id)
+            quadson.update_state()
+            quadson.process_command(Command(CommandType.TEST_LOCOMOTION))
 
-            # Store reduced data
-            observations['pos'].append(pos)
-            observations['euler_ori'].append(euler_ori)
-            observations['linear_vel'].append(linear_vel)
-            times.append(step * (1/240))  # Time in seconds
+            current_time += dt
+            time.sleep(dt)
 
-        current_time += dt
-        time.sleep(dt)
+    except KeyboardInterrupt:
+        logger.info("Simulation interrupted by user.")
 
-    metrics = analyze_stability(observations)
-    plot_stability(times, observations, metrics)
+    except Exception as e:
+        logger.error("An error occurred: %s", e)
+
+    finally:
+        p.disconnect()
 
 if __name__ == "__main__":
+    setup_logging()
     main()
