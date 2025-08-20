@@ -29,6 +29,8 @@ class CommandType(Enum):
     ORIENTATION = auto()
     TWIST = auto()
     TEST_LOCOMOTION = auto()
+    TEST_MODEL_CALIBRATION = auto()
+    TRAIN_MODEL = auto()
 
 # -------------------------------- Data Class -------------------------------- #
 @dataclass
@@ -45,15 +47,16 @@ class LegState:
 @dataclass
 class RobotState:
     time: float
-    euler_ori: np.ndarray[float]
-    pose: np.ndarray[float]
-    ori: np.ndarray[float]
-    linear_vel: np.ndarray[float]
-    angular_vel: np.ndarray[float]
-    legs: list[LegState]
+    pose: Optional[np.ndarray[float]] = None
+    orientation: Optional[np.ndarray[float]] = None
+    euler_orientation: Optional[np.ndarray[float]] = None
+    linear_velocity: Optional[np.ndarray[float]] = None
+    angular_velocity: Optional[np.ndarray[float]] = None
+    linear_accleration: Optional[np.ndarray[float]] = None
+    leg_states: Optional[list[LegState]] = None
 
 @dataclass
 class Command:
     type: CommandType
-    data: dict
+    data: Optional[dict] = None
     
