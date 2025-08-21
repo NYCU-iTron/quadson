@@ -3,7 +3,7 @@ import pybullet_data
 import time
 from sim.quadson import Quadson
 from common.config import Command, CommandType
-from analyze_stability import analyze_stability, plot_stability
+from analyze_gait import analyze_stability, plot_stability
 
 dt = 1 / 240
 
