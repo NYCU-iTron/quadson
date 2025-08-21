@@ -1,4 +1,5 @@
 import numpy as np
+from common.config import LegName, OrientationType
 
 class BodyKinematics:
     def __init__(self):
@@ -9,20 +10,21 @@ class BodyKinematics:
 
         # Foothold coordinates in world frame
         init_toe_x = -2.1634
-        self.footholds = [
-            np.array([body_length/2-init_toe_x, (body_width/2), 0]),  # Front-left
-            np.array([body_length/2-init_toe_x, -(body_width/2), 0]), # Front-right
-            np.array([-body_length/2+init_toe_x, (body_width/2), 0]), # Back-left
-            np.array([-body_length/2+init_toe_x, -(body_width/2), 0]) # Back-right
-        ]
+
+        self.foothold_dict = {
+            LegName.FRONT_LEFT: np.array([body_length / 2 - init_toe_x, body_width / 2, 0]),
+            LegName.FRONT_RIGHT: np.array([body_length / 2 - init_toe_x, -body_width / 2, 0]),
+            LegName.REAR_LEFT: np.array([-body_length / 2 + init_toe_x, body_width / 2, 0]),
+            LegName.REAR_RIGHT: np.array([-body_length / 2 + init_toe_x, -body_width / 2, 0]),
+        }
 
         # Shoulder coordinates in body frame
-        self.shoulders = [
-            np.array([body_length/2, body_width/2, 0]),  # Front-left
-            np.array([body_length/2, -body_width/2, 0]), # Front-right
-            np.array([-body_length/2, body_width/2, 0]), # Back-left
-            np.array([-body_length/2, -body_width/2, 0]) # Back-right
-        ]
+        self.shoulder_dict = {
+            LegName.FRONT_LEFT: np.array([body_length / 2, body_width / 2, 0]),
+            LegName.FRONT_RIGHT: np.array([body_length / 2, -body_width / 2, 0]),
+            LegName.REAR_LEFT: np.array([-body_length / 2, body_width / 2, 0]),
+            LegName.REAR_RIGHT: np.array([-body_length / 2, -body_width / 2, 0])
+        }
 
         # Transformation matrix
         # Naming convention:
@@ -37,24 +39,28 @@ class BodyKinematics:
         Rbs_back = self.calc_rotation_matrix(np.pi/2, 0, 0)
 
         # Shoulder to Body transformation, remain constant all the time
-        self.Tbs_lst = []
-        for shoulder in self.shoulders:
+        self.Tbs_dict = {}
+        for name in LegName:
             Tbs = np.eye(4)
-            Tbs[:3, :3] = Rbs_front if shoulder[0] > 0 else Rbs_back
-            Tbs[:3, 3] = shoulder
-            self.Tbs_lst.append(Tbs)
+            Tbs[:3, :3] = Rbs_front if self.shoulder_dict[name][0] > 0 else Rbs_back
+            Tbs[:3, 3] = self.shoulder_dict[name]
+            self.Tbs_dict[name] = Tbs
 
         # Initialize the legs and calculate the end effector points
-        self._ee_points = np.zeros((4, 3))
-        self._body_pose = [0, 0, 0]
+        self.ee_points = {}
+        self.body_pose = []
         
-        self.update_body_pose(0, 0, 0)
+        self.update_body_pose({
+            OrientationType.ROLL: 0,
+            OrientationType.PITCH: 0,
+            OrientationType.YAW: 0
+        })
 
     def get_ee_points(self):
-        return self._ee_points
+        return self.ee_points
     
     def get_body_pose(self):
-        return self._body_pose
+        return self.body_pose
 
     def calc_rotation_matrix(self, roll, pitch, yaw):
         """
@@ -116,18 +122,20 @@ class BodyKinematics:
         projected_point = transform_matrix @ point
         return projected_point[:3]
     
-    def update_body_pose(self, roll, pitch, yaw): 
+    def update_body_pose(self, orientation_dict: dict[OrientationType, float]): 
         """
         Update the orientation and position of the body
         """
-        
+        roll = orientation_dict.get(OrientationType.ROLL, 0)
+        pitch = orientation_dict.get(OrientationType.PITCH, 0)
+        yaw = orientation_dict.get(OrientationType.YAW, 0)
         # Body to World transformation
         self.Tb = self.calc_transform_matrix([roll, pitch, yaw], [0, 0, self.body_z])
         
         # Shoulder to World transformation
-        for (i, foothold) in enumerate(self.footholds):
-            Ts = self.Tb @ self.Tbs_lst[i]
+        for name in LegName:
+            Ts = self.Tb @ self.Tbs_dict[name]
             Ts_inv = self.calc_inv_T(Ts)
-            pe = self.calc_projected_point(Ts_inv, foothold)
-            self._ee_points[i] = pe
+            pe = self.calc_projected_point(Ts_inv, self.foothold_dict[name])
+            self.ee_points[name] = pe
             

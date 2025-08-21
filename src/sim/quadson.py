@@ -123,7 +123,10 @@ class Quadson:
                 self.leg_dict[name].set_ee_point(ee_point)
 
         elif command.type == CommandType.ORIENTATION:
-            pass
+            self.body_kinematics.update_body_pose(command.data)
+            ee_points = self.body_kinematics.get_ee_points()
+            for name, ee_point in ee_points.items():
+                self.leg_dict[name].set_ee_point(ee_point)
 
         elif command.type == CommandType.TEST_LOCOMOTION:
             ee_points = self.locomotion.get_ee_points(self.robot_state.time)
