@@ -1,5 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pybullet as p
+import pybullet_data
+import time
+from common.config import Command, CommandType
+from sim.quadson import Quadson
 
 def analyze_stability(observations):
     # Convert lists to numpy arrays
@@ -72,3 +77,47 @@ def plot_stability(times, observations, metrics):
     plt.grid(True)
     plt.tight_layout()
     plt.show()
+
+def main():
+    dt = 1 / 240
+    current_time = 0.0
+    
+    p.connect(p.GUI) # (GUI for visualization, DIRECT for headless)
+    p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
+    p.resetSimulation()
+    p.setAdditionalSearchPath(pybullet_data.getDataPath())
+    p.setGravity(0, 0, -9.81)
+    p.setTimeStep(dt)
+    p.loadURDF("plane.urdf")
+    
+    quadson = Quadson()
+
+    observations = {
+        'pos': [],
+        'euler_ori': [],
+        'linear_vel': [],
+    }
+    times = []
+    steps = 960
+    for step in range(steps):
+        quadson.process_command(Command(CommandType.TEST_LOCOMOTION))
+        p.stepSimulation()
+        
+        if step > 240:
+            # Get observation
+            robot_state = quadson.get_robot_state()
+
+            # Store reduced data
+            observations['pos'].append(robot_state.pose)
+            observations['euler_ori'].append(robot_state.euler_orientation)
+            observations['linear_vel'].append(robot_state.linear_velocity)
+            times.append(step * (1/240))  # Time in seconds
+
+        current_time += dt
+        time.sleep(dt)
+
+    metrics = analyze_stability(observations)
+    plot_stability(times, observations, metrics)
+
+if __name__ == "__main__":
+    main()
