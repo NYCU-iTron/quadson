@@ -37,13 +37,15 @@ class Quadson:
         # Initialize robot state
         self.robot_state = RobotState(
             time = 0,
-            linear_velocity=[0, 0, 0],
+            linear_velocity=np.zeros(3),
+            angular_velocity = np.zeros(3),
+            linear_accleration = np.zeros(3),
         )
         self.prev_robot_state = self.robot_state
 
         self.setup_colors()
         self.setup_friction()
-
+        self.update_state()
         self.logger.info("Quadson initialized successfully.")
 
     def setup_friction(self) -> None:
@@ -80,10 +82,7 @@ class Quadson:
         pose, orientation = p.getBasePositionAndOrientation(self.robot_id)
         euler_orientation = p.getEulerFromQuaternion(orientation)
         linear_velocity, angular_velocity = p.getBaseVelocity(self.robot_id)
-        linear_accleration = [
-            (current - previous) / self.time_step
-            for current, previous in zip(linear_velocity, self.prev_robot_state.linear_velocity)
-        ]
+        linear_accleration = (np.array(linear_velocity) - np.array(self.prev_robot_state.linear_velocity)) / self.time_step
 
         # Round the values
         self.robot_state.pose = self.round_tuple(pose, 5)

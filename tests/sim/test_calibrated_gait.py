@@ -24,9 +24,8 @@ def main():
 
     try:
         for _ in range(1000):
-            p.stepSimulation()
-            
             quadson.process_command(Command(CommandType.TEST_MODEL_CALIBRATION))
+            p.stepSimulation()
             quadson.update_state()
 
             # Fixed camera position relative to the robot

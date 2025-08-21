@@ -6,7 +6,6 @@ from common.config import Command, CommandType
 from analyze_stability import analyze_stability, plot_stability
 
 dt = 1 / 240
-current_time = 0.0
 
 # Set up PyBullet and Quadson
 p.connect(p.GUI)
@@ -46,7 +45,6 @@ for step in range(steps):
     base_pos, _ = p.getBasePositionAndOrientation(robot.robot_id)
     p.resetDebugVisualizerCamera(cameraDistance=0.8, cameraYaw=50, cameraPitch=-20, cameraTargetPosition=base_pos)
 
-    current_time += dt
     time.sleep(dt)
 
 metrics = analyze_stability(observations)
