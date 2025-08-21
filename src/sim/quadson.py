@@ -74,15 +74,27 @@ class Quadson:
     def update_state(self) -> None:
         self.prev_robot_state = deepcopy(self.robot_state)
         self.robot_state.time = self.prev_robot_state.time + self.time_step
-        self.robot_state.linear_velocity, self.robot_state.angular_velocity = p.getBaseVelocity(self.robot_id)
 
-        self.robot_state.linear_accleration = [
+        pose, orientation = p.getBasePositionAndOrientation(self.robot_id)
+        euler_orientation = p.getEulerFromQuaternion(self.robot_state.orientation)
+        linear_velocity, angular_velocity = p.getBaseVelocity(self.robot_id)
+        linear_accleration = [
             (current - previous) / self.time_step
-            for current, previous in zip(self.robot_state.linear_velocity, self.prev_robot_state.linear_velocity)
+            for current, previous in zip(linear_velocity, self.prev_robot_state.linear_velocity)
         ]
-        self.robot_state.pose, self.robot_state.orientation = p.getBasePositionAndOrientation(self.robot_id)
-        self.robot_state.euler_orientation = p.getEulerFromQuaternion(self.robot_state.orientation)
-        
+
+        # Round the values
+        self.robot_state.pose = self.round_tuple(pose, 5)
+        self.robot_state.orientation = self.round_tuple(orientation, 5)
+        self.robot_state.euler_orientation = self.round_tuple(euler_orientation, 5)
+        self.robot_state.linear_velocity = self.round_tuple(linear_velocity, 5)
+        self.robot_state.angular_velocity = self.round_tuple(angular_velocity, 5)
+        self.robot_state.linear_accleration = self.round_tuple(linear_accleration, 5)
+    
+    def get_robot_state(self) -> RobotState:
+        self.update_state()
+        return self.robot_state
+
     def process_command(self, command: Command) -> None:
         if command.type == CommandType.MOTOR_ANGLES:
             for name, motor_angles in command.data.items():
@@ -110,7 +122,13 @@ class Quadson:
                 self.leg_dict[name].set_ee_point(calibrated_ee_point)
         
         elif command.type == CommandType.TRAIN_MODEL:
-            pass
+            ee_points = self.locomotion.get_ee_points(self.robot_state.time)
+            ee_offsets = command.data
+
+            for name, ee_point in ee_points.items():
+                # Apply the model calibration offsets
+                calibrated_ee_point = np.array(ee_point) + np.array(ee_offsets[name])
+                self.leg_dict[name].set_ee_point(calibrated_ee_point)
 
         elif command.type == CommandType.TWIST:
             pass
@@ -162,38 +180,4 @@ class Quadson:
     
     def round_tuple(self, tuple, digits) -> tuple:
         return tuple(round(x, digits) for x in tuple)
-    
-# ------------------------------- PPO Training ------------------------------- #
-    def get_observation(self) -> dict:
-        # Get body state
-        self.linear_vel, self.angular_vel = p.getBaseVelocity(self.robot_id)
-        self.pos, self.ori = p.getBasePositionAndOrientation(self.robot_id)
-        self.euler_ori = p.getEulerFromQuaternion(self.ori)
-
-        # Round the values
-        digits = 5
-        pos = self.round_tuple(self.pos, digits)
-        linear_vel = self.round_tuple(self.linear_vel, digits)
-        angular_vel = self.round_tuple(self.angular_vel, digits)
-        euler_ori = self.round_tuple(self.euler_ori, digits)
-
-        # Get joint state
-        joints = []
-        for name in LegName:
-            motor_angles = self.leg_dict[name].get_motor_angles()
-            joints.extend(motor_angles)
-        joints = np.array(joints)
-
-        # Get phase
-        phase = self.locomotion.get_current_phase(self.sim_time)
-        phase_list = []
-        for name in LegName:
-            phase_list.append(np.sin(phase[name.value]))
-            phase_list.append(np.cos(phase[name.value]))
-        phase_list = np.array(phase_list)
-
-        observation = np.concatenate([euler_ori, linear_vel, angular_vel, joints, phase_list])
-        return observation
-    
-
     

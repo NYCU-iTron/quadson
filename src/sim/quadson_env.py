@@ -4,13 +4,14 @@ import pybullet_data
 from matplotlib import pyplot as plt
 import gymnasium as gym
 from stable_baselines3.common.callbacks import BaseCallback
+import logging
+from common.config import LegName, Command, CommandType, RobotState
 from sim.quadson import Quadson
-from sim.interface import Interface
-from common.config import Config
 
 class QuadsonEnv(gym.Env):
     def __init__(self):
         super().__init__()
+        self.logger = logging.getLogger(__name__)
 
         p.connect(p.GUI)  # use p.DIRECT when training
         p.configureDebugVisualizer(p.COV_ENABLE_GUI,0)
@@ -19,17 +20,16 @@ class QuadsonEnv(gym.Env):
         p.setTimeStep(1/240)
 
         planeId = p.loadURDF("plane.urdf")
-        p.changeDynamics(planeId, -1, 
-                                        lateralFriction=0.8,       # 側向摩擦力(0-1)
-                                        spinningFriction=0.1,      # 自旋摩擦力(通常小於側向摩擦力)
-                                        rollingFriction=0.01,      # 滾動摩擦力(通常更小)
-                                        restitution=0.2,           # 彈性係數(0-1)
-                                        contactDamping=10.0,       # 接觸阻尼
-                                        contactStiffness=1000.0)   # 接觸剛度  
+        p.changeDynamics(planeId, 
+                         -1, 
+                         lateralFriction = 0.8,       # 側向摩擦力(0-1)
+                         spinningFriction = 0.1,      # 自旋摩擦力(通常小於側向摩擦力)
+                         rollingFriction = 0.01,      # 滾動摩擦力(通常更小)
+                         restitution = 0.2,           # 彈性係數(0-1)
+                         contactDamping = 10.0,       # 接觸阻尼
+                         contactStiffness = 1000.0)   # 接觸剛度  
 
-        self.interface = Interface(type="model", target="ee_offset")
-        self.robot = Quadson(self.interface)
-        self.config = Config()
+        self.robot = Quadson()
 
         self.rewards = []
         self.step_counter = 0
@@ -63,18 +63,18 @@ class QuadsonEnv(gym.Env):
         p.resetSimulation()
         p.setGravity(0, 0, -9.81)
         p.loadURDF("plane.urdf")
-        self.robot = Quadson(self.interface)
-        obs = self._get_obs()
-        return obs, {}
-
+        self.robot = Quadson()
+        observation = self.robot.get_robot_state()
+        return observation, {}
+    
     def step(self, action):
-        cmd_dict = {}
-        for i, leg_name in enumerate(self.config.legs):
-            start = i * 3
-            end = start + 3
-            cmd_dict[leg_name] = action[start:end]
+        ee_offsets = {}
+        for name in LegName:
+            start_motor_id = name.value * 3
+            end_motor_id = start_motor_id + 3
+            ee_offsets[name] = action[start_motor_id:end_motor_id]
 
-        self.robot.update(cmd_dict)
+        self.robot.process_command(Command(CommandType.TRAIN_MODEL, ee_offsets))
         p.stepSimulation()
 
         # Fix the camera
@@ -84,45 +84,41 @@ class QuadsonEnv(gym.Env):
         self.step_counter += 1
         self.current_action = action
 
-        obs = self._get_obs()
-        reward = self._get_reward()
-        done = self._check_done()
+        observation = self.robot.get_robot_state()
+        reward = self.get_reward(observation)
+        done = self.check_done()
         info = {}
         truncated = False
 
         if done == True:
             self.step_counter = 0
 
-        return obs, reward, done, truncated, info
-
-    def _get_obs(self):
-        obs = self.robot.get_observation()
-        return obs
+        return observation, reward, done, truncated, info
     
-    def _get_reward(self):
+    def get_reward(self, robot_state: RobotState):
         target_x_vel = 0.5
         target_height = 0.2
 
-        roll, pitch, yaw = self.robot.get_orientation_rpy()
-        lin_vel = self.robot.get_linear_velocity()
-        ang_vel = self.robot.get_angular_velocity()
-        x, y, z = self.robot.get_position()
+        roll, pitch, yaw = robot_state.euler_orientation
+        linear_velocity = robot_state.linear_velocity
+        angular_velocity = robot_state.angular_velocity
+        x, y, z = robot_state.pose
 
         # Forward velocity
-        vel_diff = lin_vel[0] - target_x_vel
+        vel_diff = linear_velocity[0] - target_x_vel
         forward_reward = np.exp(-0.5 * vel_diff**2)
 
         # Lateral motion
-        lateral_penalty = 0.5 * lin_vel[1]**2 + 0.3 * ang_vel[1]**2
+        lateral_penalty = 0.5 * linear_velocity[1]**2 + 0.3 * angular_velocity[1]**2
 
         # Vertical motion
-        vertical_penalty = 0.5 * lin_vel[2]**2 + 0.3 * ang_vel[2]**2
+        vertical_penalty = 0.5 * linear_velocity[2]**2 + 0.3 * angular_velocity[2]**2
 
         # Pose stability
         orientation_penalty = 40 * roll**2 + 30 * pitch**2 + 5 * yaw**2
 
         # Negative x position
-        backward_penalty = 2.0 * np.clip(-lin_vel[0], 0, None)**2
+        backward_penalty = 2.0 * np.clip(-linear_velocity[0], 0, None)**2
 
         # Y axis stability
         y_diff = y
@@ -134,11 +130,9 @@ class QuadsonEnv(gym.Env):
 
         if hasattr(self, 'prev_orientation'):
             prev_roll, prev_pitch, prev_yaw = self.prev_orientation
-            orientation_change_penalty = (
-                1.2 * (roll - prev_roll)**2 + 
-                0.8 * (pitch - prev_pitch)**2 + 
-                0.3 * (yaw - prev_yaw)**2
-            )
+            orientation_change_penalty = (+1.2 * (roll - prev_roll)**2
+                                          + 0.8 * (pitch - prev_pitch)**2
+                                          + 0.3 * (yaw - prev_yaw)**2)
         else:
             orientation_change_penalty = 0
         self.prev_orientation = (roll, pitch, yaw)
@@ -156,36 +150,34 @@ class QuadsonEnv(gym.Env):
         
         self.last_action = self.current_action.copy() if hasattr(self, 'current_action') else np.zeros_like(self.action_space.sample())
 
-        reward = (
-                + 1.0 * forward_reward              # 前進獎勵
-                - 0.8 * lateral_penalty             # 側向穩定性懲罰
-                - 0.8 * vertical_penalty            # 垂直穩定性懲罰
-                - 1.0 * orientation_penalty         # 姿態穩定性懲罰
-                - 1.0 * orientation_change_penalty  # 姿態變化率懲罰
-                - 0.5 * backward_penalty            # 後退懲罰
-                - 0.5 * y_penalty                   # Y 軸穩定性懲罰
-                - 0.5 * height_penalty              # 高度穩定性懲罰
-                - energy_penalty                    # 能量效率懲罰
-                - 0.3 * smoothness_penalty          # 動作平滑度懲罰
-        )
+        reward = (+ 1.0 * forward_reward              # 前進獎勵
+                  - 0.8 * lateral_penalty             # 側向穩定性懲罰
+                  - 0.8 * vertical_penalty            # 垂直穩定性懲罰
+                  - 1.0 * orientation_penalty         # 姿態穩定性懲罰
+                  - 1.0 * orientation_change_penalty  # 姿態變化率懲罰
+                  - 0.5 * backward_penalty            # 後退懲罰
+                  - 0.5 * y_penalty                   # Y 軸穩定性懲罰
+                  - 0.5 * height_penalty              # 高度穩定性懲罰
+                  - energy_penalty                    # 能量效率懲罰
+                  - 0.3 * smoothness_penalty)         # 動作平滑度懲罰
 
-        # print('\n')
-        # print('forward_reward            : ', forward_reward            )  
-        # print('lateral_penalty           : ', lateral_penalty           )  
-        # print('vertical_penalty          : ', vertical_penalty          )  
-        # print('orientation_penalty       : ', orientation_penalty       )  
-        # print('orientation_change_penalty: ', orientation_change_penalty)  
-        # print('backward_penalty          : ', backward_penalty          )  
-        # print('y_penalty                 : ', y_penalty                 )  
-        # print('height_penalty            : ', height_penalty            )  
-        # print('energy_penalty            : ', energy_penalty            )        
-        # print('smoothness_penalty        : ', smoothness_penalty        )        
+        # self.logger.info('\n')
+        # self.logger.info('forward_reward            : ', forward_reward            )  
+        # self.logger.info('lateral_penalty           : ', lateral_penalty           )  
+        # self.logger.info('vertical_penalty          : ', vertical_penalty          )  
+        # self.logger.info('orientation_penalty       : ', orientation_penalty       )  
+        # self.logger.info('orientation_change_penalty: ', orientation_change_penalty)  
+        # self.logger.info('backward_penalty          : ', backward_penalty          )  
+        # self.logger.info('y_penalty                 : ', y_penalty                 )  
+        # self.logger.info('height_penalty            : ', height_penalty            )  
+        # self.logger.info('energy_penalty            : ', energy_penalty            )        
+        # self.logger.info('smoothness_penalty        : ', smoothness_penalty        )        
                 
         return reward
 
-    def _check_done(self):
-        roll, pitch, _ = self.robot.get_orientation_rpy()
-        z = self.robot.get_position()[2]
+    def check_done(self, robot_state: RobotState):
+        roll, pitch, _ = robot_state.euler_orientation
+        z = robot_state.pose[2]
 
         if abs(roll) > np.pi / 4 or abs(pitch) > np.pi / 4:  # 45 degrees tilt
             return True
@@ -200,7 +192,7 @@ class QuadsonEnv(gym.Env):
 
 class PlottingCallback(BaseCallback):
     def __init__(self, window_size=25, verbose=0, update_freq=1):
-        super().__init__(verbose)
+        super().__init__(verbose)        
         self.window_size = window_size
         self.update_freq = update_freq
         
@@ -258,9 +250,9 @@ class PlottingCallback(BaseCallback):
                     
             # Debugging output
             if self.verbose and self.episode_count % max(1, self.update_freq) == 0:
-                print(f"Episode {self.episode_count} | " +
-                            f"Reward: {self.current_reward:.2f} | " +
-                            f"Moving Avg ({self.window_size}): {avg:.2f}")
+                self.logger(f"Episode {self.episode_count} | " 
+                            + f"Reward: {self.current_reward:.2f} | "
+                            + f"Moving Avg ({self.window_size}): {avg:.2f}")
                 
             # Reset
             self.current_reward = 0
@@ -280,8 +272,12 @@ class PlottingCallback(BaseCallback):
         # Plot the std deviation area
         upper_bound = np.array(self.moving_avg) + np.array(self.std_devs)
         lower_bound = np.array(self.moving_avg) - np.array(self.std_devs)
-        self.ax.fill_between(episodes, lower_bound, upper_bound, 
-                                                color='red', alpha=0.2, label="±1 Std Dev")
+        self.ax.fill_between(episodes, 
+                             lower_bound,
+                             upper_bound,
+                             color = 'red', 
+                             alpha = 0.2,
+                             label="±1 Std Dev")
         
         # Add grid and legend
         self.ax.legend(loc='upper left')
@@ -308,8 +304,8 @@ class PlottingCallback(BaseCallback):
         plt.savefig("rl_training_progress.pdf", dpi=150, bbox_inches='tight')
         
         if self.verbose:
-                print("\nTraining complete. Final plots saved as 'rl_training_progress.png'")
-                print(f"Final Average Reward (last {self.window_size} episodes): {self.moving_avg[-1]:.2f}")
+            self.logger.info("\nTraining complete. Final plots saved as 'rl_training_progress.png'")
+            self.logger.info(f"Final Average Reward (last {self.window_size} episodes): {self.moving_avg[-1]:.2f}")
         
         plt.close(self.fig)
         
