@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 from common.config import LegName
-from common.leg_kinematics import LegKinematics
+from common.leg_kinematics import LegKinematics, LegState
 from sim.motor_manager import MotorManager
 
 class Leg:
@@ -20,6 +20,9 @@ class Leg:
 
         self.leg_kinematics = LegKinematics()
         self.leg_kinematics.set_motor_angles([0, np.pi, np.pi/2]) # initial motor angles
+
+    def get_leg_state(self) -> LegState:
+        return self.leg_kinematics.get_leg_state()
      
     def get_motor_angles(self)-> list[float]:
         return self.leg_kinematics.get_motor_angles()

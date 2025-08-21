@@ -53,8 +53,10 @@ class RobotState:
     linear_velocity: Optional[np.ndarray[float]] = None
     angular_velocity: Optional[np.ndarray[float]] = None
     linear_accleration: Optional[np.ndarray[float]] = None
-    leg_states: Optional[list[LegState]] = None
-
+    leg_states: Optional[dict[LegName, LegState]] = None
+    joints: Optional[np.ndarray[float]] = None
+    phases: Optional[np.ndarray[float]] = None
+    
 @dataclass
 class Command:
     type: CommandType

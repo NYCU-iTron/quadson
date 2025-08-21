@@ -35,14 +35,16 @@ class Quadson:
         self.time_step = 1 / 240
 
         # Initialize robot state
-        self.prev_robot_state = None
         self.robot_state = RobotState(
             time = 0,
             linear_velocity=[0, 0, 0],
         )
+        self.prev_robot_state = self.robot_state
 
         self.setup_colors()
         self.setup_friction()
+
+        self.logger.info("Quadson initialized successfully.")
 
     def setup_friction(self) -> None:
         joint2s = [2, 7, 12, 17]
@@ -76,7 +78,7 @@ class Quadson:
         self.robot_state.time = self.prev_robot_state.time + self.time_step
 
         pose, orientation = p.getBasePositionAndOrientation(self.robot_id)
-        euler_orientation = p.getEulerFromQuaternion(self.robot_state.orientation)
+        euler_orientation = p.getEulerFromQuaternion(orientation)
         linear_velocity, angular_velocity = p.getBaseVelocity(self.robot_id)
         linear_accleration = [
             (current - previous) / self.time_step
@@ -90,7 +92,24 @@ class Quadson:
         self.robot_state.linear_velocity = self.round_tuple(linear_velocity, 5)
         self.robot_state.angular_velocity = self.round_tuple(angular_velocity, 5)
         self.robot_state.linear_accleration = self.round_tuple(linear_accleration, 5)
-    
+
+        # Get joint state
+        joints = []
+        for name in LegName:
+            motor_angles = self.leg_dict[name].get_motor_angles()
+            joints.extend(motor_angles)
+        joints = np.array(joints)
+        self.robot_state.joints = joints
+
+        # Get phase
+        phase_dict = self.locomotion.get_current_phase(self.robot_state.time)
+        phases = []
+        for name in LegName:
+            phases.append(np.sin(phase_dict[name]))
+            phases.append(np.cos(phase_dict[name]))
+        phases = np.array(phases)
+        self.robot_state.phases = phases
+
     def get_robot_state(self) -> RobotState:
         self.update_state()
         return self.robot_state
@@ -145,27 +164,12 @@ class Quadson:
             self.logger.error("Model not loaded.")
             return None
         
-        # Get joint state
-        joints = []
-        for name in LegName:
-            motor_angles = self.leg_dict[name].get_motor_angles()
-            joints.extend(motor_angles)
-        joints = np.array(joints)
-
-        # Get phase
-        phase = self.locomotion.get_current_phase(self.robot_state.time)
-        phase_list = []
-        for name in LegName:
-            phase_list.append(np.sin(phase[name.value]))
-            phase_list.append(np.cos(phase[name.value]))
-        phase_list = np.array(phase_list)
-
         observation = np.concatenate([
             robot_state.euler_orientation,
             robot_state.linear_velocity,
             robot_state.angular_velocity,
-            joints,
-            phase_list
+            robot_state.joints,
+            robot_state.phases
         ])
 
         action, _ = self.model.predict(observation, deterministic=True)
@@ -178,6 +182,6 @@ class Quadson:
 
         return ee_offsets
     
-    def round_tuple(self, tuple, digits) -> tuple:
-        return tuple(round(x, digits) for x in tuple)
+    def round_tuple(self, values, digits) -> tuple:
+        return tuple(round(v, digits) for v in values)
     

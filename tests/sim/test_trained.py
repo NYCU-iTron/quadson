@@ -1,15 +1,9 @@
-from stable_baselines3 import PPO
 import pybullet as p
 import pybullet_data
 import time
-from pathlib import Path
 from sim.quadson import Quadson
-from sim.interface import Interface
-from common.config import Config
+from common.config import Command, CommandType
 from analyze_stability import analyze_stability, plot_stability
-
-model_path = Path(__file__).resolve().parent.parent.parent / "assets/trained/quadson_ppo"
-model = PPO.load(model_path, device='cpu')
 
 dt = 1 / 240
 current_time = 0.0
@@ -22,12 +16,11 @@ p.setTimeStep(dt)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.loadURDF("plane.urdf")
 
-interface = Interface(type="model", target="ee_offset")
-robot = Quadson(interface)
-config = Config()
+robot = Quadson()
+robot.load_model("trained/quadson_ppo")
 
 # Initial observation
-obs = robot.get_observation()
+robot_state = robot.get_robot_state()
 observations = {
     'pos': [],
     'euler_ori': [],
@@ -38,26 +31,15 @@ times = []
 # Run the model
 steps = 960
 for step in range(steps):
-    action, _states = model.predict(obs, deterministic=True)
-    cmd_dict = {}
-    for i, leg_name in enumerate(config.legs):  # Adjust leg names as per your config
-        start = i * 3
-        end = start + 3
-        cmd_dict[leg_name] = action[start:end]
-    robot.update(cmd_dict)
-
+    robot.process_command(Command(CommandType.TEST_MODEL_CALIBRATION))
     p.stepSimulation()
-
-    obs = robot.get_observation()
-    euler_ori = obs[0:3]  # roll, pitch, yaw
-    linear_vel = obs[3:6]  # x, y, z velocity
-    pos, _ = p.getBasePositionAndOrientation(robot.robot_id)
+    robot_state = robot.get_robot_state()
 
     # Store reduced data
     if step > 240:
-        observations['pos'].append(pos)
-        observations['euler_ori'].append(euler_ori)
-        observations['linear_vel'].append(linear_vel)
+        observations['pos'].append(robot_state.pose)
+        observations['euler_ori'].append(robot_state.euler_orientation)
+        observations['linear_vel'].append(robot_state.linear_velocity)
         times.append(step * (1/240))  # Time in seconds
 
     # Fixed camera position relative to the robot

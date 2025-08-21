@@ -20,8 +20,8 @@ class QuadsonEnv(gym.Env):
         p.setTimeStep(1/240)
 
         planeId = p.loadURDF("plane.urdf")
-        p.changeDynamics(planeId, 
-                         -1, 
+        p.changeDynamics(planeId,
+                         -1,
                          lateralFriction = 0.8,       # 側向摩擦力(0-1)
                          spinningFriction = 0.1,      # 自旋摩擦力(通常小於側向摩擦力)
                          rollingFriction = 0.01,      # 滾動摩擦力(通常更小)
@@ -64,7 +64,16 @@ class QuadsonEnv(gym.Env):
         p.setGravity(0, 0, -9.81)
         p.loadURDF("plane.urdf")
         self.robot = Quadson()
-        observation = self.robot.get_robot_state()
+        robot_state = self.robot.get_robot_state()
+        
+        observation = np.concatenate([
+            robot_state.euler_orientation,
+            robot_state.linear_velocity,
+            robot_state.angular_velocity,
+            robot_state.joints,
+            robot_state.phases
+        ])
+
         return observation, {}
     
     def step(self, action):
@@ -84,9 +93,18 @@ class QuadsonEnv(gym.Env):
         self.step_counter += 1
         self.current_action = action
 
-        observation = self.robot.get_robot_state()
-        reward = self.get_reward(observation)
-        done = self.check_done()
+        robot_state = self.robot.get_robot_state()
+        reward = self.get_reward(robot_state)
+
+        observation = np.concatenate([
+            robot_state.euler_orientation,
+            robot_state.linear_velocity,
+            robot_state.angular_velocity,
+            robot_state.joints,
+            robot_state.phases
+        ])
+
+        done = self.check_done(robot_state)
         info = {}
         truncated = False
 

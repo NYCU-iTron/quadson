@@ -65,7 +65,7 @@ class Locomotion:
         self.step_height = self.step_heights[gait_type]
         self.step_length = self.step_lengths[gait_type]
     
-    def get_current_phase(self, time: float) -> dict[int, float]:
+    def get_current_phase(self, time: float) -> dict[LegName, float]:
         """
         Get the phase of each leg based on the current time.
 
@@ -74,8 +74,8 @@ class Locomotion:
         """
         phase_dict = {}
         cycle_progress = (time % self.cycle_time) / self.cycle_time
-        for leg_id in LegName:
-            phase_dict[leg_id] = (cycle_progress + self.phase_dict[leg_id]) % 1.0
+        for name in LegName:
+            phase_dict[name] = (cycle_progress + self.phase_dict[name]) % 1.0
         return phase_dict
     
     def get_ee_points(self, time: float) -> dict[int, list[float]]:
