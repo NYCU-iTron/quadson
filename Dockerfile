@@ -29,17 +29,18 @@ RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.
 RUN git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
 RUN sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/g' ~/.zshrc
 
-# Install Python 3.9
+# Install Python 3.10
 RUN apt update && apt install -y \
   software-properties-common \
   && add-apt-repository ppa:deadsnakes/ppa \
   && apt update \
-  && apt install -y python3.9 python3.9-venv python3.9-dev python3-pip \
-  && ln -sf /usr/bin/python3.9 /usr/bin/python \
-  && ln -sf /usr/bin/python3.9 /usr/bin/python3
+  && apt install -y python3.10 \
+  && ln -sf /usr/bin/python3.10 /usr/bin/python \
+  && ln -sf /usr/bin/python3.10 /usr/bin/python3
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
 
 # Install python packages
-COPY requirements-can.txt /root/quadson_py/requirements-can.txt
+COPY requirements-real.txt /root/quadson_py/requirements-real.txt
 COPY requirements-sim.txt /root/quadson_py/requirements-sim.txt
 RUN pip3 install --no-cache-dir -r /root/quadson_py/requirements-real.txt
 # RUN pip3 install --no-cache-dir -r /root/quadson_py/requirements-sim.txt

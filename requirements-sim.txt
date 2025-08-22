@@ -1,3 +1,10 @@
-stable_baselines3
+stable_baselines3 == 2.7.0
 pybullet
 numpy
+cloudpickle==3.1.1
+gymnasium==1.2.0
+
+# torch+cu128 has to be installed via URL
+# see https://pytorch.org/get-started/locally/
+# Example for pip with CUDA 12.8
+# "torch==2.8.0+cu128 --index-url https://download.pytorch.org/whl/cu128",
