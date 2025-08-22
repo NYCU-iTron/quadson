@@ -1,3 +1,2 @@
-cando
 python-can
 numpy

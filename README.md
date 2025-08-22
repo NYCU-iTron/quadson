@@ -12,7 +12,7 @@ For python venv users, activate your new virtual environment and choose the requ
 
 ```sh
 # CAN bus support
-pip install -r requirements-can.txt
+pip install -r requirements-real.txt
 ```
 
 ```sh
