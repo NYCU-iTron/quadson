@@ -16,21 +16,28 @@ class Quadson:
         # Initialize components
         self.locomotion = Locomotion(GaitType.TROT)
         self.body_kinematics = BodyKinematics()
-        self.motor_manager = MotorManager(self.robot_id)
+
+        # Initialize motor manager
+        try:
+            self.motor_manager = MotorManager()
+        except Exception as e:
+            self.logger.critical(f"Failed to initialize MotorManager: {e}", exc_info=True)
+            exit(1)
         
         # Initialize legs
         self.leg_dict = {}
         for name in LegName:
             self.leg_dict[name] = Leg(name, self.motor_manager)
-
+            self.leg_dict[name].enable_torque(True)
+            
         self.time_step = 1 / 240
 
         # Initialize robot state
         self.robot_state = RobotState(
             time = 0,
             linear_velocity=np.zeros(3),
-            angular_velocity = np.zeros(3),
-            linear_accleration = np.zeros(3),
+            angular_velocity=np.zeros(3),
+            linear_accleration=np.zeros(3),
         )
         self.prev_robot_state = self.robot_state
 
@@ -148,4 +155,9 @@ class Quadson:
     
     def round_tuple(self, values, digits) -> tuple:
         return tuple(round(v, digits) for v in values)
+    
+    def shutdown(self) -> None:
+        for name in LegName:
+            self.leg_dict[name].stop_leg()
+        self.motor_manager.shutdown()
     
