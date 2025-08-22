@@ -43,7 +43,7 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
 COPY requirements-real.txt /root/quadson_py/requirements-real.txt
 COPY requirements-sim.txt /root/quadson_py/requirements-sim.txt
 RUN pip3 install --no-cache-dir -r /root/quadson_py/requirements-real.txt
-# RUN pip3 install --no-cache-dir -r /root/quadson_py/requirements-sim.txt
+RUN pip3 install --no-cache-dir -r /root/quadson_py/requirements-sim.txt
 
 # Dependencies and tools
 RUN apt-get update && apt-get install -y build-essential
