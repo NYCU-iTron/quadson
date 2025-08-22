@@ -3,7 +3,6 @@ import numpy as np
 import logging
 from common.logging_config import setup_logging
 from real.motor_manager_cando import MotorManager
-from real.leg_group import LegGroup
 
 if __name__ == '__main__':
     setup_logging()

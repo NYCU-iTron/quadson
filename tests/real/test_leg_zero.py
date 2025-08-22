@@ -4,7 +4,7 @@ import logging
 import numpy as np
 from common.logging_config import setup_logging
 from real.motor_manager import MotorManager
-from real.leg_group import LegGroup
+from real.leg import Leg
 
 if __name__ == '__main__':
     setup_logging()
@@ -16,7 +16,7 @@ if __name__ == '__main__':
         logger.critical(f"Failed to initialize MotorManager: {e}", exc_info=True)
         exit(1)
     
-    lg = LegGroup(0, motor_manager)
+    lg = Leg(0, motor_manager)
 
     try:
         lg.enable_torque(True)
