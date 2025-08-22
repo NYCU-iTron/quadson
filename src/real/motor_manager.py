@@ -292,7 +292,7 @@ class MotorManager:
         revolution = self.motor_dict[motor_id].get_param(can_config.CMD_TYPE.PRESENT_REVOLUTION)
         angle_16 = self.motor_dict[motor_id].get_param(can_config.CMD_TYPE.PRESENT_POSITION_DEG)
         
-        angle = -(revolution + (angle_16 / 65536)) / 71.96 * 2 * np.pi
+        angle = (revolution + (angle_16 / 65536)) / 71.96 * 2 * np.pi
 
         return angle
     
@@ -321,6 +321,8 @@ class MotorManager:
     def set_motor_angle(self, motor_id: int, angle) -> None:
         if not self.is_motor_id_valid(motor_id):
             return
+        
+        self.logger.info(f"Setting motor {motor_id} angle to {angle} rad")
         
         can_signal = int(round(angle * 32768 / np.pi))
         self.send_motor_cmd(motor_id, can_config.CAN_STD_TYPE.CAN_STDID_GOAL_POSITION_DEG, can_signal)
