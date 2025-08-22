@@ -22,7 +22,7 @@ def main():
     command = Command(CommandType.TEST_LOCOMOTION)
     
     try:
-        for _ in range(1000):
+        for _ in range(10000):
             quadson.process_command(command)
             p.stepSimulation()
             quadson.update_state()
