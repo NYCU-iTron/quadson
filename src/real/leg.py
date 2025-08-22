@@ -2,9 +2,10 @@ import numpy as np
 import logging
 from real.motor_manager import MotorManager
 from common.leg_kinematics import LegKinematics
+from common.config import LegName
 
 class Leg:
-    def __init__(self, leg_id: int, motor_manager: MotorManager):
+    def __init__(self, leg_name: LegName, motor_manager: MotorManager):
         self.logger = logging.getLogger(__name__)
 
         self.motor_manager = motor_manager
@@ -12,11 +13,11 @@ class Leg:
         # Leg group index ranges from 0 to 3.
         # Motor index in single leg ranges from 0 to 2.
         # Motor index in total ranges from 0 to 11.
-        self.leg_id = leg_id
+        self.leg_name = leg_name
         self.motor_indices = [
-            3 * leg_id + 0,  # Motor 0
-            3 * leg_id + 1,  # Motor 1
-            3 * leg_id + 2   # Motor 2
+            3 * leg_name.value + 0,  # Motor 0
+            3 * leg_name.value + 1,  # Motor 1
+            3 * leg_name.value + 2   # Motor 2
         ]
 
         self.leg_kinematics = LegKinematics()
@@ -50,6 +51,7 @@ class Leg:
             self.motor_manager.set_control_mode(motor_id, mode)
             
     def set_motor_angles(self, motor_angles: list[float]) -> None:
+        motor_angles = self.convert_model2motor_angles(motor_angles)
         for motor_id, motor_angle in zip(self.motor_indices, motor_angles):
             if motor_angle is None:
                 continue
@@ -64,14 +66,16 @@ class Leg:
     def set_ee_point(self, ee_point: list[float]) -> None:
         self.leg_kinematics.set_ee_point(ee_point)
         model_angles = self.leg_kinematics.get_motor_angles()
-
         motor_angles = self.convert_model2motor_angles(model_angles)
 
         for motor_id, motor_angle in zip(self.motor_indices, motor_angles):
-            self.motor_manager.set_motor_omega(motor_id, motor_angle)
+            self.motor_manager.set_motor_angle(motor_id, motor_angle)
 
     def convert_model2motor_angles(self, model_angles: list[float]) -> list[float]:
-        mech_angles = model_angles
+        motor_0 = model_angles[0]
+        motor_1 = model_angles[1] - np.pi / 2
+        motor_2 = -model_angles[2] + 2 * np.pi / 3
+        mech_angles = [motor_0, motor_1, motor_2]
         return mech_angles
     
     def stop_leg(self) -> None:
