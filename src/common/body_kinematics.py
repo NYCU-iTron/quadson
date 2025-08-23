@@ -12,24 +12,26 @@ class BodyKinematics:
         init_toe_x = -2.1634
 
         self.foothold_dict = {
-            LegName.FRONT_LEFT: np.array([body_length / 2 - init_toe_x, body_width / 2, 0]),
-            LegName.FRONT_RIGHT: np.array([body_length / 2 - init_toe_x, -body_width / 2, 0]),
-            LegName.REAR_LEFT: np.array([-body_length / 2 + init_toe_x, body_width / 2, 0]),
-            LegName.REAR_RIGHT: np.array([-body_length / 2 + init_toe_x, -body_width / 2, 0]),
+            LegName.FRONT_LEFT: np.array([body_length/2-init_toe_x, body_width/2, 0]),
+            LegName.FRONT_RIGHT: np.array([body_length/2-init_toe_x, -body_width/2, 0]),
+            LegName.REAR_LEFT: np.array([-body_length/2+init_toe_x, body_width/2, 0]),
+            LegName.REAR_RIGHT: np.array([-body_length/2+init_toe_x, -body_width/2, 0]),
         }
 
         # Shoulder coordinates in body frame
         self.shoulder_dict = {
-            LegName.FRONT_LEFT: np.array([body_length / 2, body_width / 2, 0]),
-            LegName.FRONT_RIGHT: np.array([body_length / 2, -body_width / 2, 0]),
-            LegName.REAR_LEFT: np.array([-body_length / 2, body_width / 2, 0]),
-            LegName.REAR_RIGHT: np.array([-body_length / 2, -body_width / 2, 0])
+            LegName.FRONT_LEFT: np.array([body_length/2, body_width/2, 0]),
+            LegName.FRONT_RIGHT: np.array([body_length/2, -body_width/2, 0]),
+            LegName.REAR_LEFT: np.array([-body_length/2, body_width/2, 0]),
+            LegName.REAR_RIGHT: np.array([-body_length/2, -body_width/2, 0])
         }
 
-        # Transformation matrix
-        # Naming convention:
-        #   b: body frame
-        #   s: shoulder frame
+        # Naming convention for transformation matrices:
+        #   Tb: Body to World transformation matrix
+        #   Tbs: Shoulder to Body transformation matrix
+        #   Ts: Shoulder to World transformation matrix
+        #   pe: End effector point in the world frame
+        #   Tbs_dict: Dictionary of shoulder to body transformation matrices for each leg
 
         # Body to World transformation
         self.Tb = self.calc_transform_matrix([0, 0, 0], [0, 0, self.body_z])
@@ -67,16 +69,16 @@ class BodyKinematics:
         Compute 3D rotation matrix from roll, pitch, yaw (XYZ Euler angles).
         """
         Rx = np.array([[1, 0, 0],
-                                        [0, np.cos(roll), -np.sin(roll)],
-                                        [0, np.sin(roll), np.cos(roll)]])
+                       [0, np.cos(roll), -np.sin(roll)],
+                       [0, np.sin(roll), np.cos(roll)]])
         
         Ry = np.array([[np.cos(pitch), 0, np.sin(pitch)],
-                                        [0, 1, 0],
-                                        [-np.sin(pitch), 0, np.cos(pitch)]])
+                       [0, 1, 0],
+                       [-np.sin(pitch), 0, np.cos(pitch)]])
         
         Rz = np.array([[np.cos(yaw), -np.sin(yaw), 0],
-                                        [np.sin(yaw), np.cos(yaw), 0],
-                                        [0, 0, 1]])
+                       [np.sin(yaw), np.cos(yaw), 0],
+                       [0, 0, 1]])
 
         return Rz @ Ry @ Rx
 
@@ -129,6 +131,7 @@ class BodyKinematics:
         roll = orientation_dict.get(OrientationType.ROLL, 0)
         pitch = orientation_dict.get(OrientationType.PITCH, 0)
         yaw = orientation_dict.get(OrientationType.YAW, 0)
+        
         # Body to World transformation
         self.Tb = self.calc_transform_matrix([roll, pitch, yaw], [0, 0, self.body_z])
         
