@@ -1,4 +1,4 @@
-# Quadson - Quadruped Robot Control Framework
+# Quadson: A Quadruped Robot Control Framework
 
 A comprehensive control framework for the Quadson quadruped robot, implementing kinematic algorithms, locomotion control, and deep reinforcement learning for stable and adaptive walking.
 
@@ -13,6 +13,17 @@ Quadson is a quadruped robot platform that combines classical kinematics with de
 - **Deep RL Integration**: PPO-based learning for adaptive gait optimization
 - **Simulation Environment**: PyBullet-based physics simulation with Gymnasium interface
 
+The following GIFs illustrate two major stages of control development:
+
+<p align="center">
+  <img src="assets/gait_algorithm.gif" alt="Algorithmic Gait Control" height="300"/>
+  <img src="assets/gait_drl.gif" alt="DRL-based Gait Control" height="300"/>
+</p>
+
+<p align="center">
+  <em>Figure 1. Comparison of algorithmic gait control and DRL-trained locomotion.</em>
+</p>
+
 ## Features
 
 ### Kinematics
@@ -20,6 +31,14 @@ Quadson is a quadruped robot platform that combines classical kinematics with de
 - **Inverse Kinematics**: Analytical solution for 3-DOF leg mechanism
 - **Differential Kinematics**: Velocity control via Moore-Penrose pseudoinverse
 - **Body Kinematics**: World-to-shoulder frame transformations for pose control
+
+<p align="center">
+  <img src="assets/body_kinematics.gif" alt="Body Kinematics Visualization" height="300"/>
+</p>
+
+<p align="center">
+  <em>Figure 2. Body kinematics visualization showing body pose control through world-to-shoulder transformations.</em>
+</p>
 
 ### Locomotion
 - Support for multiple gaits: walk, trot, pace, bound, and gallop
