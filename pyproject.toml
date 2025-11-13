@@ -1,0 +1,87 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quadson_py"
+version = "0.1.0"
+description = "A comprehensive control framework for the Quadson quadruped robot"
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Ying-Pei Lin", email = ""},
+]
+keywords = ["robotics", "quadruped", "kinematics", "reinforcement-learning", "locomotion"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Robotics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+]
+
+dependencies = [
+    "numpy",
+]
+
+[project.optional-dependencies]
+real = [
+    "python-can",
+    "numpy",
+]
+
+sim = [
+    "stable-baselines3==2.7.0",
+    "pybullet",
+    "numpy",
+    "cloudpickle==3.1.1",
+    "gymnasium==1.2.0",
+    # Note: torch+cu128 should be installed via URL
+    # pip install torch==2.8.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+]
+
+dev = [
+    "pytest",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+all = [
+    "python-can",
+    "stable-baselines3==2.7.0",
+    "pybullet",
+    "numpy",
+    "cloudpickle==3.1.1",
+    "gymnasium==1.2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/zebra314/quadson_py"
+Repository = "https://github.com/zebra314/quadson_py"
+Issues = "https://github.com/zebra314/quadson_py/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+include = '\.pyi?$'
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false

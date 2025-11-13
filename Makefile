@@ -1,4 +1,4 @@
-all: ensure-build run
+all: ensure-build
 
 # Build the image
 build:
@@ -34,12 +34,12 @@ ensure-build:
 		fi; \
 	else \
 		echo -e "\e[1;36mNetwork is down, finding the cached image\e[0m"; \
-		if [ -f "tmp/image/kiborpc-2025.tar" ]; then \
+		if [ -f "tmp/image/quadson-py.tar" ]; then \
 			echo -e "\e[1;36mCached image found, loading the image\e[0m"; \
 			$(MAKE) load; \
 		else \
 			echo -e "\e[1;36mCached image not found, checking if the image is already present\e[0m"; \
-			if [ -z "$$(docker images -q kiborpc-2025:latest)" ]; then \
+			if [ -z "$$(docker images -q quadson-py:latest)" ]; then \
 				echo -e "\e[31mImage not found, please build the image when connected to a network\e[0m"; \
 				exit 1; \
 			else \
@@ -51,8 +51,8 @@ ensure-build:
 # Run the container
 # Note: The following command requires X11 forwarding to be set up on your host machine.
 run:
-	@if [ -z "$$(docker images -q kiborpc-2025:latest)" ]; then \
-		echo "Image kiborpc-2025:latest not found. Please build the image first."; \
+	@if [ -z "$$(docker images -q quadson-py:latest)" ]; then \
+		echo "Image quadson-py:latest not found. Please build the image first."; \
 		exit 1; \
 	fi
 	xhost +local:root
@@ -71,5 +71,3 @@ run:
 		--mount type=bind,source=$(CURDIR)/tests/,target=/root/quadson_py/tests \
 		quadson-py:latest zsh
 	xhost -local:root
-
-ssh:
