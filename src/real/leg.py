@@ -23,14 +23,17 @@ class Leg:
         self.leg_kinematics = LegKinematics()
         self.leg_kinematics.set_motor_angles([0, np.pi, np.pi/2]) # initial motor angles
 
+    def set_motor_indices(self, motor_indices: list[int]) -> None:
+        self.motor_indices = motor_indices
+
     def get_zero_states(self) -> list[bool]:
         zero_states = []
         for motor_id in self.motor_indices:
             zero_state = self.motor_manager.get_zero_state(motor_id)
             zero_states.append(zero_state)
-        
+
         return zero_states
-    
+
     def get_motor_angles(self) -> list[float]:
         motor_angles = []
         for motor_id in self.motor_indices:
@@ -38,10 +41,10 @@ class Leg:
             motor_angles.append(motor_angle)
 
         return motor_angles
-    
+
     def get_ee_point(self) -> list[float]:
         return self.leg_kinematics.get_ee_point()
-    
+
     def enable_torque(self, enable: bool) -> None:
         for motor_id in self.motor_indices:
             self.motor_manager.enable_motor_torque(motor_id, enable)
@@ -49,7 +52,7 @@ class Leg:
     def set_control_mode(self, mode: int) -> None:
         for motor_id in self.motor_indices:
             self.motor_manager.set_control_mode(motor_id, mode)
-            
+
     def set_motor_angles(self, motor_angles: list[float]) -> None:
         motor_angles = self.convert_model2motor_angles(motor_angles)
         for motor_id, motor_angle in zip(self.motor_indices, motor_angles):
@@ -77,7 +80,7 @@ class Leg:
         motor_2 = -model_angles[2] + 2 * np.pi / 3
         mech_angles = [motor_0, motor_1, motor_2]
         return mech_angles
-    
+
     def stop_leg(self) -> None:
         for motor_id in self.motor_indices:
             self.motor_manager.stop_motor(motor_id)
