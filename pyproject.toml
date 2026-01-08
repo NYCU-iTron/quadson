@@ -9,9 +9,6 @@ description = "A comprehensive control framework for the Quadson quadruped robot
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 license = {text = "MIT"}
-authors = [
-    {name = "Ying-Pei Lin", email = ""},
-]
 keywords = ["robotics", "quadruped", "kinematics", "reinforcement-learning", "locomotion"]
 classifiers = [
     "Development Status :: 3 - Alpha",
