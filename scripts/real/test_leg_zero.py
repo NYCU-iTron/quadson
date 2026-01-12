@@ -61,7 +61,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     finally:
-        lg.stop_leg()
+        leg.stop_leg()
         time.sleep(0.05)
         motor_manager.shutdown()
         logger.info("Done")
