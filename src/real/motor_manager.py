@@ -33,20 +33,16 @@ class MotorManager:
         return bus
 
     def connect_motors(self) -> dict[int, Motor]:
-        # Create 12 motor objects
-        # Motor ID starts from 0, ends at 11
-        motor_dict = {}
-        for motor_id in range(12):
-            motor_dict[motor_id] = Motor(motor_id, False)
-        
+        motor_dict = {mid: Motor(mid, False) for mid in range(12)}
+
         self.logger.info("Connecting motors...")
 
-        for motor_id in range(12):
-            # Clear the buffer
-            for _ in range(10):
-                msg = self.bus.recv(timeout=0.001)
+        # Clear the buffer
+        while self.bus.recv(timeout=0) is not None:
+            pass
 
-            # Prepare message
+        # Send ping to all motors
+        for motor_id in range(12):
             can_id = 0x00 | (motor_id << can_config.ID_STD_OFFSET)
             msg = can.Message(
                 arbitration_id=can_id,
@@ -55,45 +51,46 @@ class MotorManager:
                 is_extended_id=False
             )
 
-            connected = False
-            max_tries = 3
-            while not connected and max_tries > 0:
+            try:
                 self.bus.send(msg)
-                self.received_message = self.bus.recv(timeout=0.001)
+            except can.CanError as e:
+                self.logger.error(f"Failed to send ping to motor {motor_id}: {e}")
 
-                # Check if the motor responds
-                if self.received_message is None:
-                    self.logger.warning(f"Motor {motor_id} does not respond")
-                    max_tries -= 1
-                    continue
+        # Wait for responses
+        timeout_start = time.time()
+        wait_time = 0.2 # 200 ms
 
-                # Check if the message has error
-                if not self.is_message_valid(self.received_message):
-                    max_tries -= 1
-                    continue
-                
-                motor_message = self.decode_msg(self.received_message)
+        while (time.time() - timeout_start) < wait_time:
+            rx_msg = self.bus.recv(timeout=0.01)
 
-                # Check if the motor ID matches
-                if motor_message.motor_id != motor_id:
-                    self.logger.warning(f"Expected motor {motor_id}, but got {motor_message.motor_id}")
-                    max_tries -= 1
-                    continue
+            if rx_msg is None:
+                continue
 
-                connected = True
-                self.logger.info(f"Motor {motor_id} connected successfully")
+            if not self.is_message_valid(rx_msg):
+                continue
 
-            motor_dict[motor_id].connected = connected
-            if not connected:
-                self.logger.warning(f"Failed to connect motor {motor_id} after multiple attempts")
+            try:
+                decoded = self.decode_msg(rx_msg)
+                target_id = decoded.motor_id
 
-        # Clear the buffer
-        for _ in range(10):
-            msg = self.bus.recv(timeout=0.001)
+                if target_id in motor_dict and not motor_dict[target_id].connected:
+                    motor_dict[target_id].connected = True
+                    self.logger.info(f"Motor {target_id} connected successfully")
+
+                if all(m.connected for m in motor_dict.values()):
+                    break
+
+            except Exception as e:
+                self.logger.warning(f"Error decoding message: {e}")
+
+        # Log motors that failed to connect
+        for mid, motor in motor_dict.items():
+            if not motor.connected:
+                self.logger.warning(f"Failed to connect motor {mid}")
 
         self.logger.info("Finished connecting motors")
         return motor_dict
-    
+
     def shutdown(self) -> None:
         self.thread_stop_event.clear()
         self.thread_pause_event.clear()
