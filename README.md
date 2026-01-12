@@ -93,6 +93,13 @@ Then install the project to ensure that the modules can be imported correctly:
 pip install -e .
 ```
 
+### Firmware Setup (Real Robot)
+
+```sh
+sudo pacman -S stlink
+st-flash write assets/firmware.bin 0x8000000
+```
+
 ## CAN Bus Setup (Real Robot)
 
 Before launching the program on real hardware, ensure your host kernel supports CAN bus.
