@@ -3,6 +3,7 @@ import struct
 import threading
 import can
 import logging
+import time
 import real.can_config as can_config
 from real.motor_message import MotorMessage
 from real.motor import Motor
