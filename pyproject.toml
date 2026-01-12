@@ -39,13 +39,6 @@ sim = [
     # pip install torch==2.8.0+cu128 --index-url https://download.pytorch.org/whl/cu128
 ]
 
-dev = [
-    "pytest",
-    "black",
-    "flake8",
-    "mypy",
-]
-
 all = [
     "python-can",
     "stable-baselines3==2.7.0",
@@ -54,11 +47,6 @@ all = [
     "cloudpickle==3.1.1",
     "gymnasium==1.2.0",
 ]
-
-[project.urls]
-Homepage = "https://github.com/zebra314/quadson_py"
-Repository = "https://github.com/zebra314/quadson_py"
-Issues = "https://github.com/zebra314/quadson_py/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
